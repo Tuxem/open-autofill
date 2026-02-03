@@ -255,7 +255,11 @@ async function handleImport(event) {
 
 // ============== TABS ==============
 
+let currentTab = 'profiles';
+
 function switchTab(tabName) {
+  currentTab = tabName;
+
   // Update tab buttons
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabName);
@@ -266,6 +270,132 @@ function switchTab(tabName) {
     const isActive = panel.id === `panel-${tabName}`;
     panel.classList.toggle('hidden', !isActive);
   });
+
+  // Update search placeholder
+  const searchInput = document.getElementById('search-input');
+  searchInput.placeholder = tabName === 'profiles' ? 'Search profiles...' : 'Search rules...';
+
+  // Reset search and pagination when switching tabs
+  searchInput.value = '';
+  searchQuery = '';
+  profilesPage = 1;
+  rulesPage = 1;
+
+  // Re-render with reset state
+  if (tabName === 'profiles') {
+    renderProfiles(cachedProfiles);
+  } else {
+    renderRules(cachedRules);
+  }
+}
+
+// ============== SEARCH & PAGINATION ==============
+
+const ITEMS_PER_PAGE = 10;
+let searchQuery = '';
+let profilesPage = 1;
+let rulesPage = 1;
+
+function handleSearch(event) {
+  searchQuery = event.target.value.toLowerCase().trim();
+  profilesPage = 1;
+  rulesPage = 1;
+
+  if (currentTab === 'profiles') {
+    renderProfiles(cachedProfiles);
+  } else {
+    renderRules(cachedRules);
+  }
+}
+
+function filterProfiles(profiles) {
+  if (!searchQuery) return profiles;
+  return profiles.filter(p =>
+    (p.name && p.name.toLowerCase().includes(searchQuery)) ||
+    (p.site && p.site.toLowerCase().includes(searchQuery)) ||
+    (p.hotkey && p.hotkey.toLowerCase().includes(searchQuery))
+  );
+}
+
+function filterRules(rules) {
+  if (!searchQuery) return rules;
+  return rules.filter(r =>
+    (r.name && r.name.toLowerCase().includes(searchQuery)) ||
+    (r.value && r.value.toLowerCase().includes(searchQuery)) ||
+    (r.type && r.type.toLowerCase().includes(searchQuery)) ||
+    (r.site && r.site.toLowerCase().includes(searchQuery))
+  );
+}
+
+function paginate(items, page) {
+  const start = (page - 1) * ITEMS_PER_PAGE;
+  return items.slice(start, start + ITEMS_PER_PAGE);
+}
+
+function updatePagination(type, filteredCount, totalCount) {
+  const pagination = document.getElementById(`${type}-pagination`);
+  const pageInfo = document.getElementById(`${type}-page-info`);
+  const prevBtn = document.getElementById(`${type}-prev`);
+  const nextBtn = document.getElementById(`${type}-next`);
+  const resultsCount = document.getElementById('search-results-count');
+
+  const page = type === 'profiles' ? profilesPage : rulesPage;
+  const totalPages = Math.ceil(filteredCount / ITEMS_PER_PAGE);
+
+  if (filteredCount === 0) {
+    pagination.classList.add('hidden');
+    resultsCount.textContent = searchQuery ? 'No results' : '';
+    return;
+  }
+
+  if (totalPages > 1) {
+    pagination.classList.remove('hidden');
+    pagination.classList.add('flex');
+    const start = (page - 1) * ITEMS_PER_PAGE + 1;
+    const end = Math.min(page * ITEMS_PER_PAGE, filteredCount);
+    pageInfo.textContent = `${start}-${end} of ${filteredCount}`;
+    prevBtn.disabled = page <= 1;
+    nextBtn.disabled = page >= totalPages;
+  } else {
+    pagination.classList.add('hidden');
+  }
+
+  // Update results count
+  if (searchQuery) {
+    resultsCount.textContent = `${filteredCount} result${filteredCount !== 1 ? 's' : ''}`;
+  } else {
+    resultsCount.textContent = '';
+  }
+}
+
+function handleProfilesPrev() {
+  if (profilesPage > 1) {
+    profilesPage--;
+    renderProfiles(cachedProfiles);
+  }
+}
+
+function handleProfilesNext() {
+  const filtered = filterProfiles(cachedProfiles);
+  if (profilesPage < Math.ceil(filtered.length / ITEMS_PER_PAGE)) {
+    profilesPage++;
+    renderProfiles(cachedProfiles);
+  }
+}
+
+function handleRulesPrev() {
+  if (rulesPage > 1) {
+    rulesPage--;
+    renderRules(cachedRules);
+  }
+}
+
+function handleRulesNext() {
+  const filtered = filterRules(cachedRules);
+  if (rulesPage < Math.ceil(filtered.length / ITEMS_PER_PAGE)) {
+    rulesPage++;
+    renderRules(cachedRules);
+  }
 }
 
 // ============== PROFILES ==============
@@ -277,7 +407,6 @@ async function loadProfiles() {
     const response = await sendMessage('GET_PROFILES');
     cachedProfiles = response.profiles || [];
     renderProfiles(cachedProfiles);
-    updateProfilesDropdown();
     return cachedProfiles;
   } catch (error) {
     console.error('Failed to load profiles:', error);
@@ -291,8 +420,23 @@ function renderProfiles(profiles) {
   const table = document.getElementById('profiles-table');
   const tbody = document.getElementById('profiles-tbody');
 
+  // Filter and paginate
+  const filtered = filterProfiles(profiles);
+  const paginated = paginate(filtered, profilesPage);
+
+  // Update pagination
+  updatePagination('profiles', filtered.length, profiles.length);
+
   if (profiles.length === 0) {
     emptyState.classList.remove('hidden');
+    emptyState.querySelector('p').textContent = 'No profiles yet. Create your first profile to start auto-filling forms.';
+    table.classList.add('hidden');
+    return;
+  }
+
+  if (filtered.length === 0) {
+    emptyState.classList.remove('hidden');
+    emptyState.querySelector('p').textContent = 'No profiles match your search.';
     table.classList.add('hidden');
     return;
   }
@@ -300,7 +444,7 @@ function renderProfiles(profiles) {
   emptyState.classList.add('hidden');
   table.classList.remove('hidden');
 
-  tbody.innerHTML = profiles.map(profile => `
+  tbody.innerHTML = paginated.map(profile => `
     <tr data-id="${profile.id}">
       <td>${escapeHtml(profile.name)}</td>
       <td class="max-w-[200px] truncate">${profile.site ? escapeHtml(profile.site) : '<span class="text-gray-400 italic">(all sites)</span>'}</td>
@@ -323,10 +467,19 @@ function renderProfiles(profiles) {
   `).join('');
 }
 
+// Track inline rules for the profile modal
+let inlineRules = [];
+let deletedRuleIds = [];
+
 function showProfileModal(profile = null) {
   const modal = document.getElementById('modal-profile');
   const overlay = document.getElementById('modal-overlay');
   const title = document.getElementById('modal-profile-title');
+  const rulesSection = document.getElementById('profile-rules-section');
+
+  // Reset inline rules tracking
+  inlineRules = [];
+  deletedRuleIds = [];
 
   // Set form values
   document.getElementById('profile-id').value = profile?.id || '';
@@ -337,6 +490,16 @@ function showProfileModal(profile = null) {
   // Update title
   title.textContent = profile ? 'Edit Profile' : 'Add Profile';
 
+  // Show/hide rules section based on edit mode
+  if (profile) {
+    rulesSection.classList.remove('hidden');
+    // Load rules for this profile
+    inlineRules = cachedRules.filter(r => r.profileId === profile.id).map(r => ({ ...r }));
+    renderInlineRules();
+  } else {
+    rulesSection.classList.add('hidden');
+  }
+
   // Show modal
   overlay.classList.remove('hidden');
   modal.classList.remove('hidden');
@@ -344,6 +507,106 @@ function showProfileModal(profile = null) {
 
   // Focus first field
   document.getElementById('profile-name').focus();
+}
+
+function renderInlineRules() {
+  const emptyState = document.getElementById('profile-rules-empty');
+  const table = document.getElementById('profile-rules-table');
+  const tbody = document.getElementById('profile-rules-tbody');
+
+  if (inlineRules.length === 0) {
+    emptyState.classList.remove('hidden');
+    table.classList.add('hidden');
+    return;
+  }
+
+  emptyState.classList.add('hidden');
+  table.classList.remove('hidden');
+
+  tbody.innerHTML = inlineRules.map((rule, index) => `
+    <tr data-index="${index}">
+      <td>
+        <input type="text" class="form-input text-sm py-1.5" value="${escapeHtml(rule.name)}"
+               data-field="name" placeholder="Field name" required>
+      </td>
+      <td>
+        <input type="text" class="form-input text-sm py-1.5" value="${escapeHtml(rule.value)}"
+               data-field="value" placeholder="Value">
+      </td>
+      <td>
+        <select class="form-select text-sm py-1.5" data-field="type">
+          <option value="Text" ${rule.type === 'Text' ? 'selected' : ''}>Text</option>
+          <option value="Select" ${rule.type === 'Select' ? 'selected' : ''}>Select</option>
+          <option value="Checkbox" ${rule.type === 'Checkbox' ? 'selected' : ''}>Checkbox</option>
+          <option value="Radio" ${rule.type === 'Radio' ? 'selected' : ''}>Radio</option>
+        </select>
+      </td>
+      <td>
+        <select class="form-select text-sm py-1.5" data-field="mode">
+          <option value="Overwrite" ${rule.mode === 'Overwrite' ? 'selected' : ''}>Overwrite</option>
+          <option value="Append" ${rule.mode === 'Append' ? 'selected' : ''}>Append</option>
+          <option value="Skip if filled" ${rule.mode === 'Skip if filled' ? 'selected' : ''}>Skip if filled</option>
+        </select>
+      </td>
+      <td>
+        <button type="button" class="btn-icon-only btn-delete" title="Delete rule" data-action="delete-inline-rule" data-index="${index}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+        </button>
+      </td>
+    </tr>
+  `).join('');
+
+  // Add change listeners to update inlineRules
+  tbody.querySelectorAll('input, select').forEach(el => {
+    el.addEventListener('change', handleInlineRuleChange);
+    el.addEventListener('input', handleInlineRuleChange);
+  });
+}
+
+function handleInlineRuleChange(event) {
+  const row = event.target.closest('tr');
+  const index = parseInt(row.dataset.index, 10);
+  const field = event.target.dataset.field;
+  const value = event.target.value;
+
+  if (inlineRules[index]) {
+    inlineRules[index][field] = value;
+  }
+}
+
+function addInlineRule() {
+  const profileId = document.getElementById('profile-id').value;
+  inlineRules.push({
+    id: null, // New rule, will be created on save
+    name: '',
+    value: '',
+    type: 'Text',
+    mode: 'Overwrite',
+    site: null,
+    profileId: profileId
+  });
+  renderInlineRules();
+
+  // Focus the new row's first input
+  const tbody = document.getElementById('profile-rules-tbody');
+  const lastRow = tbody.lastElementChild;
+  if (lastRow) {
+    const firstInput = lastRow.querySelector('input');
+    if (firstInput) firstInput.focus();
+  }
+}
+
+function deleteInlineRule(index) {
+  const rule = inlineRules[index];
+  if (rule && rule.id) {
+    // Mark existing rule for deletion
+    deletedRuleIds.push(rule.id);
+  }
+  inlineRules.splice(index, 1);
+  renderInlineRules();
 }
 
 async function handleSaveProfile(event) {
@@ -359,25 +622,70 @@ async function handleSaveProfile(event) {
     return;
   }
 
+  // Validate inline rules (if editing)
+  if (id && inlineRules.length > 0) {
+    for (const rule of inlineRules) {
+      if (!rule.name.trim()) {
+        showToast('All rules must have a field name', 'error');
+        return;
+      }
+    }
+  }
+
   try {
+    // Save profile
     const messageType = id ? 'UPDATE_PROFILE' : 'CREATE_PROFILE';
     const data = { name, site, hotkey };
     if (id) data.id = id;
 
     const result = await sendMessage(messageType, data);
 
-    if (result.success) {
-      showToast(id ? 'Profile updated' : 'Profile created', 'success');
-      hideModal();
-      await loadProfiles();
-      await loadAllRules();
-      await loadStats();
-    } else {
+    if (!result.success) {
       throw new Error(result.error || 'Failed to save profile');
     }
+
+    // Save rules (only when editing existing profile)
+    if (id) {
+      // Delete removed rules
+      for (const ruleId of deletedRuleIds) {
+        try {
+          await sendMessage('DELETE_RULE', { id: ruleId });
+        } catch (e) {
+          console.warn('Failed to delete rule:', e);
+        }
+      }
+
+      // Create or update rules
+      for (const rule of inlineRules) {
+        const ruleData = {
+          name: rule.name.trim(),
+          value: rule.value,
+          type: rule.type,
+          mode: rule.mode,
+          site: rule.site,
+          profileId: id
+        };
+
+        if (rule.id) {
+          // Update existing rule
+          ruleData.id = rule.id;
+          await sendMessage('UPDATE_RULE', ruleData);
+        } else {
+          // Create new rule
+          await sendMessage('CREATE_RULE', ruleData);
+        }
+      }
+    }
+
+    showToast(id ? 'Profile and rules saved' : 'Profile created', 'success');
+    hideModal();
+    await loadProfiles();
+    await loadAllRules();
+    await loadStats();
+
   } catch (error) {
     console.error('Failed to save profile:', error);
-    showToast('Failed to save profile: ' + error.message, 'error');
+    showToast('Failed to save: ' + error.message, 'error');
   }
 }
 
@@ -427,17 +735,32 @@ function renderRules(rules) {
   const emptyState = document.getElementById('rules-empty');
   const groupedContainer = document.getElementById('rules-grouped');
 
+  // Filter and paginate
+  const filtered = filterRules(rules);
+  const paginated = paginate(filtered, rulesPage);
+
+  // Update pagination
+  updatePagination('rules', filtered.length, rules.length);
+
   if (rules.length === 0) {
     emptyState.classList.remove('hidden');
+    emptyState.querySelector('p').textContent = 'No rules yet. Rules define how form fields are filled for each profile.';
+    groupedContainer.innerHTML = '';
+    return;
+  }
+
+  if (filtered.length === 0) {
+    emptyState.classList.remove('hidden');
+    emptyState.querySelector('p').textContent = 'No rules match your search.';
     groupedContainer.innerHTML = '';
     return;
   }
 
   emptyState.classList.add('hidden');
 
-  // Group rules by profile
+  // Group paginated rules by profile
   const rulesByProfile = {};
-  for (const rule of rules) {
+  for (const rule of paginated) {
     const profileId = rule.profileId || 'unknown';
     if (!rulesByProfile[profileId]) {
       rulesByProfile[profileId] = [];
@@ -494,33 +817,144 @@ function renderRules(rules) {
   `).join('');
 }
 
-function updateProfilesDropdown() {
-  const select = document.getElementById('rule-profile');
-  const currentValue = select.value;
+// ============== PROFILE COMBOBOX ==============
 
-  // Keep the first option
-  select.innerHTML = '<option value="">Select a profile...</option>';
+let profileComboboxOpen = false;
 
-  for (const profile of cachedProfiles) {
-    const option = document.createElement('option');
-    option.value = profile.id;
-    option.textContent = profile.name;
-    select.appendChild(option);
+function renderProfileDropdown(filter = '') {
+  const dropdown = document.getElementById('profile-dropdown');
+  const filterLower = filter.toLowerCase();
+
+  const filtered = cachedProfiles.filter(p =>
+    p.name.toLowerCase().includes(filterLower)
+  );
+
+  if (filtered.length === 0) {
+    dropdown.innerHTML = '<div class="px-3 py-2 text-gray-500 dark:text-gray-400 text-sm">No profiles found</div>';
+  } else {
+    dropdown.innerHTML = filtered.map(profile => `
+      <div class="combobox-option" tabindex="-1"
+           data-profile-id="${profile.id}"
+           data-profile-name="${escapeHtml(profile.name)}">
+        <div class="font-medium text-gray-800 dark:text-gray-200">${escapeHtml(profile.name)}</div>
+        ${profile.site ? `<div class="text-xs text-gray-500 dark:text-gray-400">${escapeHtml(profile.site)}</div>` : ''}
+      </div>
+    `).join('');
+  }
+}
+
+function openProfileCombobox() {
+  const dropdown = document.getElementById('profile-dropdown');
+  const searchInput = document.getElementById('rule-profile-search');
+
+  renderProfileDropdown(searchInput.value);
+  dropdown.classList.remove('hidden');
+  profileComboboxOpen = true;
+}
+
+function closeProfileCombobox() {
+  const dropdown = document.getElementById('profile-dropdown');
+  dropdown.classList.add('hidden');
+  profileComboboxOpen = false;
+}
+
+function selectProfile(profileId, profileName) {
+  document.getElementById('rule-profile').value = profileId;
+  document.getElementById('rule-profile-search').value = profileName;
+  closeProfileCombobox();
+}
+
+function handleProfileSearchInput(event) {
+  const value = event.target.value;
+  renderProfileDropdown(value);
+
+  // Clear selection if user types something different
+  const hiddenInput = document.getElementById('rule-profile');
+  const currentProfile = cachedProfiles.find(p => p.id === hiddenInput.value);
+  if (currentProfile && currentProfile.name !== value) {
+    hiddenInput.value = '';
   }
 
-  // Restore selection if still valid
-  if (currentValue && cachedProfiles.some(p => p.id === currentValue)) {
-    select.value = currentValue;
+  if (!profileComboboxOpen) {
+    openProfileCombobox();
   }
+}
+
+function handleProfileDropdownClick(event) {
+  const option = event.target.closest('[data-profile-id]');
+  if (option) {
+    selectProfile(option.dataset.profileId, option.dataset.profileName);
+  }
+}
+
+function setupProfileCombobox() {
+  const searchInput = document.getElementById('rule-profile-search');
+  const dropdown = document.getElementById('profile-dropdown');
+  const combobox = document.getElementById('profile-combobox');
+
+  // Open on focus
+  searchInput.addEventListener('focus', openProfileCombobox);
+
+  // Filter on input
+  searchInput.addEventListener('input', handleProfileSearchInput);
+
+  // Select on click
+  dropdown.addEventListener('click', handleProfileDropdownClick);
+
+  // Close on click outside
+  document.addEventListener('click', (e) => {
+    if (!combobox.contains(e.target) && profileComboboxOpen) {
+      closeProfileCombobox();
+    }
+  });
+
+  // Keyboard navigation
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeProfileCombobox();
+    } else if (e.key === 'ArrowDown' && profileComboboxOpen) {
+      e.preventDefault();
+      const firstOption = dropdown.querySelector('[data-profile-id]');
+      if (firstOption) firstOption.focus();
+    }
+  });
+
+  dropdown.addEventListener('keydown', (e) => {
+    const current = document.activeElement;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = current.nextElementSibling;
+      if (next && next.dataset.profileId) next.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = current.previousElementSibling;
+      if (prev && prev.dataset.profileId) {
+        prev.focus();
+      } else {
+        searchInput.focus();
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (current.dataset.profileId) {
+        selectProfile(current.dataset.profileId, current.dataset.profileName);
+      }
+    } else if (e.key === 'Escape') {
+      closeProfileCombobox();
+      searchInput.focus();
+    }
+  });
+
+  // Make dropdown options focusable
+  dropdown.addEventListener('mouseover', (e) => {
+    const option = e.target.closest('[data-profile-id]');
+    if (option) option.setAttribute('tabindex', '0');
+  });
 }
 
 function showRuleModal(rule = null) {
   const modal = document.getElementById('modal-rule');
   const overlay = document.getElementById('modal-overlay');
   const title = document.getElementById('modal-rule-title');
-
-  // Update profiles dropdown first
-  updateProfilesDropdown();
 
   // Set form values
   document.getElementById('rule-id').value = rule?.id || '';
@@ -531,6 +965,15 @@ function showRuleModal(rule = null) {
   document.getElementById('rule-site').value = rule?.site || '';
   document.getElementById('rule-mode').value = rule?.mode || 'Overwrite';
 
+  // Set profile search input value
+  const searchInput = document.getElementById('rule-profile-search');
+  if (rule?.profileId) {
+    const profile = cachedProfiles.find(p => p.id === rule.profileId);
+    searchInput.value = profile ? profile.name : '';
+  } else {
+    searchInput.value = '';
+  }
+
   // Update title
   title.textContent = rule ? 'Edit Rule' : 'Add Rule';
 
@@ -539,8 +982,8 @@ function showRuleModal(rule = null) {
   modal.classList.remove('hidden');
   document.getElementById('modal-profile').classList.add('hidden');
 
-  // Focus first field
-  document.getElementById('rule-profile').focus();
+  // Focus search field
+  searchInput.focus();
 }
 
 async function handleSaveRule(event) {
@@ -648,10 +1091,22 @@ function setupEventListeners() {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
 
+  // Search
+  document.getElementById('search-input').addEventListener('input', handleSearch);
+
+  // Pagination
+  document.getElementById('profiles-prev').addEventListener('click', handleProfilesPrev);
+  document.getElementById('profiles-next').addEventListener('click', handleProfilesNext);
+  document.getElementById('rules-prev').addEventListener('click', handleRulesPrev);
+  document.getElementById('rules-next').addEventListener('click', handleRulesNext);
+
   // Profile management
   document.getElementById('btn-add-profile').addEventListener('click', () => showProfileModal());
   document.getElementById('btn-save-profile').addEventListener('click', handleSaveProfile);
   document.getElementById('btn-cancel-profile').addEventListener('click', hideModal);
+
+  // Inline rules management (in profile modal)
+  document.getElementById('btn-add-rule-inline').addEventListener('click', addInlineRule);
 
   // Rule management
   document.getElementById('btn-add-rule').addEventListener('click', () => showRuleModal());
@@ -684,6 +1139,7 @@ function setupEventListeners() {
 
     const action = btn.dataset.action;
     const id = btn.dataset.id;
+    const index = btn.dataset.index;
 
     switch (action) {
       case 'edit-profile': {
@@ -702,12 +1158,16 @@ function setupEventListeners() {
       case 'delete-rule':
         handleDeleteRule(id);
         break;
+      case 'delete-inline-rule':
+        deleteInlineRule(parseInt(index, 10));
+        break;
     }
   });
 }
 
 async function init() {
   setupEventListeners();
+  setupProfileCombobox();
   await loadAuthStatus();
   await loadSettings();
   await loadProfiles();

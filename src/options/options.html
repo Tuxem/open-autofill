@@ -112,6 +112,17 @@
             <button class="tab-btn" data-tab="rules">Rules</button>
           </div>
 
+          <!-- Search Bar -->
+          <div class="flex items-center gap-3 mb-4">
+            <div class="relative flex-1">
+              <input type="text" id="search-input" class="form-input pl-9" placeholder="Search profiles...">
+              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+            </div>
+            <span class="text-sm text-gray-500 dark:text-gray-400" id="search-results-count"></span>
+          </div>
+
           <!-- Profiles Tab -->
           <div class="tab-panel" id="panel-profiles">
             <div class="flex justify-end mb-4">
@@ -133,6 +144,14 @@
                 <tbody id="profiles-tbody"></tbody>
               </table>
             </div>
+            <!-- Profiles Pagination -->
+            <div class="hidden flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-700" id="profiles-pagination">
+              <span class="text-sm text-gray-500 dark:text-gray-400" id="profiles-page-info"></span>
+              <div class="flex gap-2">
+                <button class="btn btn-secondary btn-sm" id="profiles-prev" disabled>&larr; Previous</button>
+                <button class="btn btn-secondary btn-sm" id="profiles-next">Next &rarr;</button>
+              </div>
+            </div>
           </div>
 
           <!-- Rules Tab -->
@@ -145,6 +164,14 @@
                 <p>No rules yet. Rules define how form fields are filled for each profile.</p>
               </div>
               <div id="rules-grouped" class="space-y-6"></div>
+            </div>
+            <!-- Rules Pagination -->
+            <div class="hidden flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-700" id="rules-pagination">
+              <span class="text-sm text-gray-500 dark:text-gray-400" id="rules-page-info"></span>
+              <div class="flex gap-2">
+                <button class="btn btn-secondary btn-sm" id="rules-prev" disabled>&larr; Previous</button>
+                <button class="btn btn-secondary btn-sm" id="rules-next">Next &rarr;</button>
+              </div>
             </div>
           </div>
         </div>
@@ -204,28 +231,60 @@
 
     <!-- Modal Overlay -->
     <div class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-5 dark:bg-black/70" id="modal-overlay">
-      <!-- Profile Modal -->
-      <div class="modal hidden" id="modal-profile">
+      <!-- Profile Modal (wider for rules) -->
+      <div class="modal hidden !max-w-2xl" id="modal-profile">
         <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
           <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100" id="modal-profile-title">Add Profile</h3>
           <button class="w-8 h-8 flex items-center justify-center text-2xl text-gray-500 hover:bg-gray-100 rounded transition-colors dark:text-gray-400 dark:hover:bg-gray-700" data-modal="profile">&times;</button>
         </div>
-        <div class="p-5 overflow-y-auto flex-1">
+        <div class="p-5 overflow-y-auto flex-1 max-h-[70vh]">
           <form id="form-profile">
             <input type="hidden" id="profile-id">
-            <div class="mb-4">
-              <label class="form-label" for="profile-name">Name *</label>
-              <input type="text" id="profile-name" class="form-input" required placeholder="e.g., Work Forms">
+
+            <!-- Profile Info Section -->
+            <div class="mb-6">
+              <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Profile Information</h4>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="form-label" for="profile-name">Name *</label>
+                  <input type="text" id="profile-name" class="form-input" required placeholder="e.g., Work Forms">
+                </div>
+                <div>
+                  <label class="form-label" for="profile-hotkey">Hotkey</label>
+                  <input type="text" id="profile-hotkey" class="form-input" placeholder="e.g., Ctrl+1">
+                </div>
+              </div>
+              <div class="mt-4">
+                <label class="form-label" for="profile-site">Site (optional)</label>
+                <input type="text" id="profile-site" class="form-input" placeholder="e.g., example.com">
+                <small class="form-hint">Leave empty to use on all sites</small>
+              </div>
             </div>
-            <div class="mb-4">
-              <label class="form-label" for="profile-site">Site (optional)</label>
-              <input type="text" id="profile-site" class="form-input" placeholder="e.g., example.com">
-              <small class="form-hint">Leave empty to use on all sites</small>
-            </div>
-            <div>
-              <label class="form-label" for="profile-hotkey">Hotkey (optional)</label>
-              <input type="text" id="profile-hotkey" class="form-input" placeholder="e.g., Ctrl+1">
-              <small class="form-hint">Keyboard shortcut to quickly fill with this profile</small>
+
+            <!-- Rules Section (only visible when editing) -->
+            <div class="hidden" id="profile-rules-section">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Rules</h4>
+                <button type="button" class="btn btn-primary btn-sm" id="btn-add-rule-inline">+ Add Rule</button>
+              </div>
+
+              <div class="border border-gray-200 rounded-lg dark:border-gray-700 overflow-hidden">
+                <div class="text-center py-6 text-gray-500 dark:text-gray-400" id="profile-rules-empty">
+                  <p>No rules for this profile yet.</p>
+                </div>
+                <table class="data-table hidden" id="profile-rules-table">
+                  <thead>
+                    <tr>
+                      <th>Field</th>
+                      <th>Value</th>
+                      <th>Type</th>
+                      <th>Mode</th>
+                      <th class="w-16"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="profile-rules-tbody"></tbody>
+                </table>
+              </div>
             </div>
           </form>
         </div>
@@ -245,10 +304,17 @@
           <form id="form-rule">
             <input type="hidden" id="rule-id">
             <div class="mb-4">
-              <label class="form-label" for="rule-profile">Profile *</label>
-              <select id="rule-profile" class="form-select" required>
-                <option value="">Select a profile...</option>
-              </select>
+              <label class="form-label" for="rule-profile-search">Profile *</label>
+              <div class="relative" id="profile-combobox">
+                <input type="hidden" id="rule-profile" required>
+                <input type="text" id="rule-profile-search" class="form-input" placeholder="Search profiles..." autocomplete="off">
+                <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+                <div class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto dark:bg-gray-800 dark:border-gray-700" id="profile-dropdown">
+                  <!-- Options will be populated by JS -->
+                </div>
+              </div>
             </div>
             <div class="mb-4">
               <label class="form-label" for="rule-name">Field Name *</label>
