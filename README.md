@@ -46,13 +46,14 @@ A Firefox extension (Manifest V3) for automatic form filling with bi-directional
 2. **Google OAuth Setup** (required for sync):
    - Create a project in [Google Cloud Console](https://console.cloud.google.com/)
    - Enable the Google Sheets API
-   - Create OAuth 2.0 credentials (Web application type)
+   - Create OAuth 2.0 credentials (usually **Web application** type works, but **Chrome app** or **Other** is also suitable for extensions)
+   - **Note**: This extension uses the **Implicit Flow**, so you do **NOT** need a `client_secret`. Only the `client_id` is required.
    - Retrieve your extension's redirect URI:
      - Open Firefox and go to `about:debugging`
      - Find "Open Autofill" and click "Inspect" (this opens the background page console)
      - Look for the log message: `Extension Redirect URI: ...`
    - Add this URI to the "Authorized redirect URIs" in your Google Cloud Console credentials
-   - Update `src/shared/constants.js` with your client ID
+   - Update `src/shared/constants.js` with your **Client ID**
 
 3. **Extension ID**:
    - The extension ID is configured in `manifest.json` under `browser_specific_settings.gecko.id`.
@@ -152,7 +153,7 @@ open-autofill/
     │   │   └── storage.js    # Storage abstraction layer
     │   ├── network/
     │   │   ├── messaging.js  # Browser messaging utilities
-    │   │   ├── oauth.js      # Google OAuth2 with PKCE
+    │   │   ├── oauth.js      # Google OAuth2 Implicit Flow
     │   │   └── sync.js       # Google Sheets synchronization
     │   └── logic/
     │       ├── form-detector.js    # Form detection engine
