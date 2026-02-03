@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Open Autofill - Options</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="options-container">
+    <header class="options-header">
+      <div class="options-logo">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+          <path d="M7 9h10M7 13h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h1>Open Autofill</h1>
+      <span class="options-version">v1.0.0</span>
+    </header>
+
+    <main class="options-main">
+      <!-- Authentication Section -->
+      <section class="options-section" id="auth-section">
+        <h2>Google Account</h2>
+        <div class="options-card">
+          <div id="auth-status">
+            <div class="auth-disconnected" id="auth-disconnected">
+              <p>Connect your Google account to sync profiles and rules with Google Sheets.</p>
+              <button class="btn btn-primary" id="btn-connect">
+                <svg class="btn-icon" viewBox="0 0 24 24">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                Connect with Google
+              </button>
+            </div>
+            <div class="auth-connected hidden" id="auth-connected">
+              <div class="auth-user">
+                <span class="auth-email" id="auth-email">user@example.com</span>
+                <span class="auth-badge">Connected</span>
+              </div>
+              <button class="btn btn-secondary" id="btn-disconnect">Disconnect</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Google Sheet Configuration -->
+      <section class="options-section" id="sheet-section">
+        <h2>Google Sheet</h2>
+        <div class="options-card">
+          <div class="form-group">
+            <label for="sheet-id">Sheet ID</label>
+            <input type="text" id="sheet-id" placeholder="e.g., 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms">
+            <small>Find the ID in your Google Sheet URL: docs.google.com/spreadsheets/d/<strong>[SHEET_ID]</strong>/edit</small>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="profiles-tab">Profiles Tab Name</label>
+              <input type="text" id="profiles-tab" value="Profiles">
+            </div>
+            <div class="form-group">
+              <label for="rules-tab">Rules Tab Name</label>
+              <input type="text" id="rules-tab" value="Rules">
+            </div>
+          </div>
+
+          <button class="btn btn-primary" id="btn-save-sheet">Save Sheet Settings</button>
+        </div>
+      </section>
+
+      <!-- Sync Settings -->
+      <section class="options-section" id="sync-section">
+        <h2>Synchronization</h2>
+        <div class="options-card">
+          <div class="form-group">
+            <label for="sync-interval">Sync Interval (minutes)</label>
+            <input type="number" id="sync-interval" min="1" max="60" value="10">
+            <small>How often to automatically sync with Google Sheets. Set to 0 to disable auto-sync.</small>
+          </div>
+
+          <div class="sync-status">
+            <div class="sync-info">
+              <span class="sync-label">Last sync:</span>
+              <span class="sync-value" id="last-sync">Never</span>
+            </div>
+            <div class="sync-info">
+              <span class="sync-label">Status:</span>
+              <span class="sync-value" id="sync-status-value">-</span>
+            </div>
+          </div>
+
+          <div class="btn-group">
+            <button class="btn btn-primary" id="btn-sync-now">Sync Now</button>
+            <button class="btn btn-secondary" id="btn-save-sync">Save Sync Settings</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Import/Export -->
+      <section class="options-section" id="data-section">
+        <h2>Data Management</h2>
+        <div class="options-card">
+          <p>Export your profiles and rules to a JSON file, or import from a backup.</p>
+          <div class="btn-group">
+            <button class="btn btn-secondary" id="btn-export">Export Data</button>
+            <button class="btn btn-secondary" id="btn-import">Import Data</button>
+            <input type="file" id="import-file" accept=".json" style="display:none;">
+          </div>
+        </div>
+      </section>
+
+      <!-- Statistics -->
+      <section class="options-section" id="stats-section">
+        <h2>Statistics</h2>
+        <div class="options-card">
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-value" id="stat-profiles">0</span>
+              <span class="stat-label">Profiles</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-value" id="stat-rules">0</span>
+              <span class="stat-label">Rules</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-value" id="stat-pending">0</span>
+              <span class="stat-label">Pending Writes</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- About -->
+      <section class="options-section" id="about-section">
+        <h2>About</h2>
+        <div class="options-card">
+          <p><strong>Open Autofill</strong> is a Firefox extension for automatic form filling with bi-directional Google Sheets synchronization.</p>
+          <p>Version 1.0.0</p>
+          <p class="about-links">
+            <a href="https://github.com/yourusername/open-autofill" target="_blank">GitHub</a>
+            <span class="divider">|</span>
+            <a href="https://github.com/yourusername/open-autofill/issues" target="_blank">Report Issue</a>
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Toast notifications -->
+    <div class="toast-container" id="toast-container"></div>
+  </div>
+
+  <script src="options.js" type="module"></script>
+</body>
+</html>

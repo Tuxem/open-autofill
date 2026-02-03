@@ -1,0 +1,74 @@
+{
+  "manifest_version": 3,
+  "name": "Open Autofill",
+  "version": "1.0.0",
+  "description": "Form autofill extension with bi-directional Google Sheets synchronization",
+
+  "permissions": [
+    "storage",
+    "alarms",
+    "contextMenus",
+    "identity"
+  ],
+
+  "host_permissions": [
+    "https://sheets.googleapis.com/*",
+    "https://www.googleapis.com/*",
+    "https://oauth2.googleapis.com/*",
+    "https://accounts.google.com/*"
+  ],
+
+  "background": {
+    "scripts": ["src/background/background.js"],
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "src/lib/utils.js",
+        "src/lib/messaging.js",
+        "src/content/event-dispatcher.js",
+        "src/content/form-detector.js",
+        "src/content/form-filler.js",
+        "src/content/field-extractor.js",
+        "src/content/mutation-watcher.js",
+        "src/ui/floating-bar.js",
+        "src/ui/save-dialog.js",
+        "src/content/content.js"
+      ],
+      "css": [],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  },
+
+  "action": {
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    },
+    "default_title": "Open Autofill"
+  },
+
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "open-autofill@extension.local",
+      "strict_min_version": "109.0"
+    }
+  }
+}
