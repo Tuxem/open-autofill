@@ -17,7 +17,9 @@ import {
   DEFAULT_SYNC_STATE,
   DEFAULT_AUTH,
   STORAGE_VERSION,
-  CONTEXT_MENU_IDS
+  CONTEXT_MENU_IDS,
+  FIELD_TYPES,
+  FILL_MODES
 } from '../constants.js';
 
 // ============== STORAGE MODULE ==============
@@ -877,6 +879,173 @@ async function handleMessage(message, sender) {
       return { success: true };
     }
 
+    // ============== PROFILE CRUD ==============
+
+    case MESSAGE_TYPES.CREATE_PROFILE: {
+      const profile = {
+        id: generateProfileId(),
+        name: data.name || 'New Profile',
+        hotkey: data.hotkey || null,
+        site: data.site || null,
+        syncedAt: null
+      };
+
+      await Storage.saveProfile(profile);
+
+      // Sync to Google Sheets if configured
+      try {
+        const settings = await Storage.getSettings();
+        if (settings.sheetId) {
+          await Sync.pushProfile(profile);
+        }
+      } catch (e) {
+        console.warn('Failed to sync new profile:', e);
+        await Sync.queueWrite('profile', profile.id);
+      }
+
+      return { success: true, profile };
+    }
+
+    case MESSAGE_TYPES.UPDATE_PROFILE: {
+      const existingProfile = await Storage.getProfile(data.id);
+      if (!existingProfile) {
+        throw new Error('Profile not found');
+      }
+
+      const updatedProfile = {
+        ...existingProfile,
+        name: data.name !== undefined ? data.name : existingProfile.name,
+        hotkey: data.hotkey !== undefined ? data.hotkey : existingProfile.hotkey,
+        site: data.site !== undefined ? data.site : existingProfile.site
+      };
+
+      await Storage.saveProfile(updatedProfile);
+
+      // Sync to Google Sheets
+      try {
+        const settings = await Storage.getSettings();
+        if (settings.sheetId) {
+          await Sync.pushProfile(updatedProfile);
+        }
+      } catch (e) {
+        console.warn('Failed to sync updated profile:', e);
+        await Sync.queueWrite('profile', updatedProfile.id);
+      }
+
+      return { success: true, profile: updatedProfile };
+    }
+
+    case MESSAGE_TYPES.DELETE_PROFILE: {
+      const profile = await Storage.getProfile(data.id);
+      if (!profile) {
+        throw new Error('Profile not found');
+      }
+
+      // Delete profile and its associated rules
+      await Storage.deleteProfile(data.id);
+
+      // Note: Deleting from Google Sheets requires more complex handling
+      // For now, we mark the row as deleted or leave it to manual cleanup
+      // A full implementation would clear the row or remove it
+
+      return { success: true };
+    }
+
+    // ============== RULE CRUD ==============
+
+    case MESSAGE_TYPES.GET_ALL_RULES: {
+      const rules = await Storage.getRules();
+      return { rules: Object.values(rules) };
+    }
+
+    case MESSAGE_TYPES.CREATE_RULE: {
+      const rule = {
+        id: generateRuleId(),
+        type: data.type || 'Text',
+        name: data.name || '',
+        value: data.value || '',
+        site: data.site || null,
+        mode: data.mode || 'Overwrite',
+        profileId: data.profileId
+      };
+
+      if (!rule.profileId) {
+        throw new Error('Profile ID is required');
+      }
+
+      // Verify profile exists
+      const profile = await Storage.getProfile(rule.profileId);
+      if (!profile) {
+        throw new Error('Profile not found');
+      }
+
+      await Storage.saveRule(rule);
+
+      // Sync to Google Sheets
+      try {
+        const settings = await Storage.getSettings();
+        if (settings.sheetId) {
+          await Sync.pushRule(rule);
+        }
+      } catch (e) {
+        console.warn('Failed to sync new rule:', e);
+        await Sync.queueWrite('rule', rule.id);
+      }
+
+      return { success: true, rule };
+    }
+
+    case MESSAGE_TYPES.UPDATE_RULE: {
+      const existingRule = await Storage.getRule(data.id);
+      if (!existingRule) {
+        throw new Error('Rule not found');
+      }
+
+      const updatedRule = {
+        ...existingRule,
+        type: data.type !== undefined ? data.type : existingRule.type,
+        name: data.name !== undefined ? data.name : existingRule.name,
+        value: data.value !== undefined ? data.value : existingRule.value,
+        site: data.site !== undefined ? data.site : existingRule.site,
+        mode: data.mode !== undefined ? data.mode : existingRule.mode,
+        profileId: data.profileId !== undefined ? data.profileId : existingRule.profileId
+      };
+
+      // Verify profile exists if changed
+      if (data.profileId && data.profileId !== existingRule.profileId) {
+        const profile = await Storage.getProfile(data.profileId);
+        if (!profile) {
+          throw new Error('Profile not found');
+        }
+      }
+
+      await Storage.saveRule(updatedRule);
+
+      // Sync to Google Sheets
+      try {
+        const settings = await Storage.getSettings();
+        if (settings.sheetId) {
+          await Sync.pushRule(updatedRule);
+        }
+      } catch (e) {
+        console.warn('Failed to sync updated rule:', e);
+        await Sync.queueWrite('rule', updatedRule.id);
+      }
+
+      return { success: true, rule: updatedRule };
+    }
+
+    case MESSAGE_TYPES.DELETE_RULE: {
+      const rule = await Storage.getRule(data.id);
+      if (!rule) {
+        throw new Error('Rule not found');
+      }
+
+      await Storage.deleteRule(data.id);
+
+      return { success: true };
+    }
+
     // ============== FILL ==============
 
     case MESSAGE_TYPES.FILL_FORM: {
@@ -915,6 +1084,10 @@ function generateRuleId() {
   const randomPart = Math.random().toString(36).substring(2, 8);
   return `r_${timestamp}${randomPart}`;
 }
+
+// Log redirect URI for OAuth configuration
+const redirectUri = browser.identity.getRedirectURL();
+console.log('Extension Redirect URI:', redirectUri);
 
 function urlMatches(currentUrl, pattern) {
   if (!pattern) return true;

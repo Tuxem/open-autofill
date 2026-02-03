@@ -7,7 +7,7 @@
 export const OAUTH_CONFIG = {
   clientId: '1058799799273-l91bh2agp2h8n6p167rd8cfdlg5a2uis.apps.googleusercontent.com',
   // For Firefox extensions, we use the identity API redirect
-  redirectUri: 'https://YOUR_EXTENSION_ID.extensions.allizom.org/',
+  redirectUri: 'https://497229dae2a2309ae9b8ff995b389ebd037fef2a.extensions.allizom.org/',
   authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
   tokenEndpoint: 'https://oauth2.googleapis.com/token',
   revokeEndpoint: 'https://oauth2.googleapis.com/revoke',
@@ -105,7 +105,18 @@ export const MESSAGE_TYPES = {
   GET_SETTINGS: 'GET_SETTINGS',
   FORCE_SYNC: 'FORCE_SYNC',
   EXPORT_DATA: 'EXPORT_DATA',
-  IMPORT_DATA: 'IMPORT_DATA'
+  IMPORT_DATA: 'IMPORT_DATA',
+
+  // Profile CRUD
+  CREATE_PROFILE: 'CREATE_PROFILE',
+  UPDATE_PROFILE: 'UPDATE_PROFILE',
+  DELETE_PROFILE: 'DELETE_PROFILE',
+
+  // Rule CRUD
+  CREATE_RULE: 'CREATE_RULE',
+  UPDATE_RULE: 'UPDATE_RULE',
+  DELETE_RULE: 'DELETE_RULE',
+  GET_ALL_RULES: 'GET_ALL_RULES'
 };
 
 // Context menu IDs

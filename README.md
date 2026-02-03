@@ -21,13 +21,23 @@ A Firefox extension (Manifest V3) for automatic form filling with bi-directional
    cd open-autofill
    ```
 
-2. Open Firefox and navigate to `about:debugging`
+2. Build the extension:
+   ```bash
+   # Option 1: Using Docker (recommended - no local dependencies)
+   ./build.sh
 
-3. Click "This Firefox" in the left sidebar
+   # Option 2: Using npm directly
+   npm install
+   npm run build:css
+   ```
 
-4. Click "Load Temporary Add-on..."
+3. Load in Firefox (temporary mode):
+   - Open Firefox and navigate to `about:debugging`
+   - Click "This Firefox" in the left sidebar
+   - Click "Load Temporary Add-on..."
+   - Navigate to the `open-autofill` folder and select `manifest.json`
 
-5. Navigate to the `open-autofill` folder and select `manifest.json`
+> **Note**: In temporary mode, the extension will be removed when Firefox closes. For permanent installation, the extension needs to be signed by Mozilla.
 
 ### Configuration
 
@@ -37,12 +47,20 @@ A Firefox extension (Manifest V3) for automatic form filling with bi-directional
    - Create a project in [Google Cloud Console](https://console.cloud.google.com/)
    - Enable the Google Sheets API
    - Create OAuth 2.0 credentials (Web application type)
-   - Add your extension's redirect URI
+   - Retrieve your extension's redirect URI:
+     - Open Firefox and go to `about:debugging`
+     - Find "Open Autofill" and click "Inspect" (this opens the background page console)
+     - Look for the log message: `Extension Redirect URI: ...`
+   - Add this URI to the "Authorized redirect URIs" in your Google Cloud Console credentials
    - Update `src/constants.js` with your client ID
 
-3. Connect your Google account in the extension options
+3. **Extension ID**:
+   - The extension ID is configured in `manifest.json` under `browser_specific_settings.gecko.id`.
+   - Changing this ID will change your redirect URI.
 
-4. Enter your Google Sheet ID
+4. Connect your Google account in the extension options
+
+5. Enter your Google Sheet ID
 
 ## Google Sheet Setup
 
@@ -99,16 +117,42 @@ Create a Google Sheet with two tabs:
 
 ## Development
 
+### Prerequisites
+
+- **Option A**: Docker (recommended)
+- **Option B**: Node.js 18+ and npm
+
+### Build Commands
+
+```bash
+# Build CSS (required before first run)
+./build.sh                    # Auto-detects Docker or npm
+
+# Or manually with npm
+npm install                   # Install dependencies
+npm run build:css             # Build minified CSS
+
+# Development mode (watch for changes)
+npm run watch:css
+```
+
 ### Project Structure
 
 ```
 open-autofill/
 ├── manifest.json           # Extension manifest (MV3)
+├── Dockerfile              # Docker build configuration
+├── build.sh                # Build script (Docker or npm)
+├── package.json            # npm dependencies
+├── tailwind.config.js      # Tailwind CSS configuration
 ├── src/
 │   ├── background/         # Service worker scripts
 │   ├── content/            # Content scripts
-│   ├── ui/                 # UI components
+│   ├── ui/                 # UI components (floating bar)
 │   ├── options/            # Options page
+│   ├── styles/             # CSS sources and output
+│   │   ├── input.css       # Tailwind source
+│   │   └── output.css      # Generated CSS (built)
 │   ├── lib/                # Shared utilities
 │   └── constants.js        # Configuration constants
 ├── icons/                  # Extension icons
@@ -117,11 +161,19 @@ open-autofill/
 
 ### Key Files
 
-- `background/background.js` - Service worker orchestration
-- `background/oauth.js` - Google OAuth2 implementation
-- `background/sync.js` - Google Sheets synchronization
+- `background/background.js` - Service worker orchestration (OAuth, sync, messaging)
 - `content/form-filler.js` - Form filling engine
 - `ui/floating-bar.js` - Floating UI component
+- `options/options.js` - Options page with profile/rule management
+
+### Development Workflow
+
+1. Make changes to source files
+2. If you modified CSS/HTML, rebuild: `npm run build:css`
+3. In Firefox `about:debugging`, click "Reload" on the extension
+4. Test your changes
+
+> **Tip**: Use `npm run watch:css` to auto-rebuild CSS on changes.
 
 ## Security
 

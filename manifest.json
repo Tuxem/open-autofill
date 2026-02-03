@@ -67,7 +67,7 @@
 
   "browser_specific_settings": {
     "gecko": {
-      "id": "open-autofill@extension.local",
+      "id": "open-autofill@open-autofill.local",
       "strict_min_version": "109.0"
     }
   }

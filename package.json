@@ -1,0 +1,13 @@
+{
+  "name": "open-autofill",
+  "version": "1.0.0",
+  "description": "Firefox extension for automatic form filling with Google Sheets sync",
+  "scripts": {
+    "build:css": "tailwindcss -i ./src/styles/input.css -o ./src/styles/output.css --minify",
+    "watch:css": "tailwindcss -i ./src/styles/input.css -o ./src/styles/output.css --watch",
+    "build": "npm run build:css"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.1"
+  }
+}

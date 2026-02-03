@@ -16,7 +16,9 @@ function showToast(message, type = 'info') {
   container.appendChild(toast);
 
   setTimeout(() => {
-    toast.remove();
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(20px)';
+    setTimeout(() => toast.remove(), 200);
   }, 3000);
 }
 
@@ -39,10 +41,12 @@ async function loadAuthStatus() {
     if (status.isAuthenticated) {
       disconnectedEl.classList.add('hidden');
       connectedEl.classList.remove('hidden');
+      connectedEl.classList.add('flex');
       emailEl.textContent = status.userEmail || 'Connected';
     } else {
       disconnectedEl.classList.remove('hidden');
       connectedEl.classList.add('hidden');
+      connectedEl.classList.remove('flex');
     }
   } catch (error) {
     console.error('Failed to load auth status:', error);
@@ -249,6 +253,377 @@ async function handleImport(event) {
   event.target.value = '';
 }
 
+// ============== TABS ==============
+
+function switchTab(tabName) {
+  // Update tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabName);
+  });
+
+  // Update tab panels
+  document.querySelectorAll('.tab-panel').forEach(panel => {
+    const isActive = panel.id === `panel-${tabName}`;
+    panel.classList.toggle('hidden', !isActive);
+  });
+}
+
+// ============== PROFILES ==============
+
+let cachedProfiles = [];
+
+async function loadProfiles() {
+  try {
+    const response = await sendMessage('GET_PROFILES');
+    cachedProfiles = response.profiles || [];
+    renderProfiles(cachedProfiles);
+    updateProfilesDropdown();
+    return cachedProfiles;
+  } catch (error) {
+    console.error('Failed to load profiles:', error);
+    showToast('Failed to load profiles: ' + error.message, 'error');
+    return [];
+  }
+}
+
+function renderProfiles(profiles) {
+  const emptyState = document.getElementById('profiles-empty');
+  const table = document.getElementById('profiles-table');
+  const tbody = document.getElementById('profiles-tbody');
+
+  if (profiles.length === 0) {
+    emptyState.classList.remove('hidden');
+    table.classList.add('hidden');
+    return;
+  }
+
+  emptyState.classList.add('hidden');
+  table.classList.remove('hidden');
+
+  tbody.innerHTML = profiles.map(profile => `
+    <tr data-id="${profile.id}">
+      <td>${escapeHtml(profile.name)}</td>
+      <td class="max-w-[200px] truncate">${profile.site ? escapeHtml(profile.site) : '<span class="text-gray-400 italic">(all sites)</span>'}</td>
+      <td>${profile.hotkey ? escapeHtml(profile.hotkey) : '<span class="text-gray-400 italic">-</span>'}</td>
+      <td class="flex gap-2">
+        <button class="btn-icon-only btn-edit" title="Edit" data-action="edit-profile" data-id="${profile.id}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+        <button class="btn-icon-only btn-delete" title="Delete" data-action="delete-profile" data-id="${profile.id}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function showProfileModal(profile = null) {
+  const modal = document.getElementById('modal-profile');
+  const overlay = document.getElementById('modal-overlay');
+  const title = document.getElementById('modal-profile-title');
+
+  // Set form values
+  document.getElementById('profile-id').value = profile?.id || '';
+  document.getElementById('profile-name').value = profile?.name || '';
+  document.getElementById('profile-site').value = profile?.site || '';
+  document.getElementById('profile-hotkey').value = profile?.hotkey || '';
+
+  // Update title
+  title.textContent = profile ? 'Edit Profile' : 'Add Profile';
+
+  // Show modal
+  overlay.classList.remove('hidden');
+  modal.classList.remove('hidden');
+  document.getElementById('modal-rule').classList.add('hidden');
+
+  // Focus first field
+  document.getElementById('profile-name').focus();
+}
+
+async function handleSaveProfile(event) {
+  event.preventDefault();
+
+  const id = document.getElementById('profile-id').value;
+  const name = document.getElementById('profile-name').value.trim();
+  const site = document.getElementById('profile-site').value.trim() || null;
+  const hotkey = document.getElementById('profile-hotkey').value.trim() || null;
+
+  if (!name) {
+    showToast('Profile name is required', 'error');
+    return;
+  }
+
+  try {
+    const messageType = id ? 'UPDATE_PROFILE' : 'CREATE_PROFILE';
+    const data = { name, site, hotkey };
+    if (id) data.id = id;
+
+    const result = await sendMessage(messageType, data);
+
+    if (result.success) {
+      showToast(id ? 'Profile updated' : 'Profile created', 'success');
+      hideModal();
+      await loadProfiles();
+      await loadAllRules();
+      await loadStats();
+    } else {
+      throw new Error(result.error || 'Failed to save profile');
+    }
+  } catch (error) {
+    console.error('Failed to save profile:', error);
+    showToast('Failed to save profile: ' + error.message, 'error');
+  }
+}
+
+async function handleDeleteProfile(profileId) {
+  const profile = cachedProfiles.find(p => p.id === profileId);
+  if (!profile) return;
+
+  if (!confirm(`Are you sure you want to delete "${profile.name}"?\n\nThis will also delete all rules associated with this profile.`)) {
+    return;
+  }
+
+  try {
+    const result = await sendMessage('DELETE_PROFILE', { id: profileId });
+
+    if (result.success) {
+      showToast('Profile deleted', 'success');
+      await loadProfiles();
+      await loadAllRules();
+      await loadStats();
+    } else {
+      throw new Error(result.error || 'Failed to delete profile');
+    }
+  } catch (error) {
+    console.error('Failed to delete profile:', error);
+    showToast('Failed to delete profile: ' + error.message, 'error');
+  }
+}
+
+// ============== RULES ==============
+
+let cachedRules = [];
+
+async function loadAllRules() {
+  try {
+    const response = await sendMessage('GET_ALL_RULES');
+    cachedRules = response.rules || [];
+    renderRules(cachedRules);
+    return cachedRules;
+  } catch (error) {
+    console.error('Failed to load rules:', error);
+    showToast('Failed to load rules: ' + error.message, 'error');
+    return [];
+  }
+}
+
+function renderRules(rules) {
+  const emptyState = document.getElementById('rules-empty');
+  const groupedContainer = document.getElementById('rules-grouped');
+
+  if (rules.length === 0) {
+    emptyState.classList.remove('hidden');
+    groupedContainer.innerHTML = '';
+    return;
+  }
+
+  emptyState.classList.add('hidden');
+
+  // Group rules by profile
+  const rulesByProfile = {};
+  for (const rule of rules) {
+    const profileId = rule.profileId || 'unknown';
+    if (!rulesByProfile[profileId]) {
+      rulesByProfile[profileId] = [];
+    }
+    rulesByProfile[profileId].push(rule);
+  }
+
+  // Create profile name map
+  const profileNames = {};
+  for (const profile of cachedProfiles) {
+    profileNames[profile.id] = profile.name;
+  }
+
+  // Render grouped rules
+  groupedContainer.innerHTML = Object.entries(rulesByProfile).map(([profileId, profileRules]) => `
+    <div>
+      <div class="rules-group-header">Profile: ${escapeHtml(profileNames[profileId] || 'Unknown')}</div>
+      <table class="data-table border border-gray-200 border-t-0 rounded-b dark:border-gray-700">
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Value</th>
+            <th>Type</th>
+            <th>Mode</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${profileRules.map(rule => `
+            <tr data-id="${rule.id}">
+              <td>${escapeHtml(rule.name)}</td>
+              <td class="max-w-[200px] truncate">${escapeHtml(rule.value)}</td>
+              <td>${escapeHtml(rule.type || 'Text')}</td>
+              <td>${escapeHtml(rule.mode || 'Overwrite')}</td>
+              <td class="flex gap-2">
+                <button class="btn-icon-only btn-edit" title="Edit" data-action="edit-rule" data-id="${rule.id}">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
+                <button class="btn-icon-only btn-delete" title="Delete" data-action="delete-rule" data-id="${rule.id}">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                </button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `).join('');
+}
+
+function updateProfilesDropdown() {
+  const select = document.getElementById('rule-profile');
+  const currentValue = select.value;
+
+  // Keep the first option
+  select.innerHTML = '<option value="">Select a profile...</option>';
+
+  for (const profile of cachedProfiles) {
+    const option = document.createElement('option');
+    option.value = profile.id;
+    option.textContent = profile.name;
+    select.appendChild(option);
+  }
+
+  // Restore selection if still valid
+  if (currentValue && cachedProfiles.some(p => p.id === currentValue)) {
+    select.value = currentValue;
+  }
+}
+
+function showRuleModal(rule = null) {
+  const modal = document.getElementById('modal-rule');
+  const overlay = document.getElementById('modal-overlay');
+  const title = document.getElementById('modal-rule-title');
+
+  // Update profiles dropdown first
+  updateProfilesDropdown();
+
+  // Set form values
+  document.getElementById('rule-id').value = rule?.id || '';
+  document.getElementById('rule-profile').value = rule?.profileId || '';
+  document.getElementById('rule-name').value = rule?.name || '';
+  document.getElementById('rule-type').value = rule?.type || 'Text';
+  document.getElementById('rule-value').value = rule?.value || '';
+  document.getElementById('rule-site').value = rule?.site || '';
+  document.getElementById('rule-mode').value = rule?.mode || 'Overwrite';
+
+  // Update title
+  title.textContent = rule ? 'Edit Rule' : 'Add Rule';
+
+  // Show modal
+  overlay.classList.remove('hidden');
+  modal.classList.remove('hidden');
+  document.getElementById('modal-profile').classList.add('hidden');
+
+  // Focus first field
+  document.getElementById('rule-profile').focus();
+}
+
+async function handleSaveRule(event) {
+  event.preventDefault();
+
+  const id = document.getElementById('rule-id').value;
+  const profileId = document.getElementById('rule-profile').value;
+  const name = document.getElementById('rule-name').value.trim();
+  const type = document.getElementById('rule-type').value;
+  const value = document.getElementById('rule-value').value;
+  const site = document.getElementById('rule-site').value.trim() || null;
+  const mode = document.getElementById('rule-mode').value;
+
+  if (!profileId) {
+    showToast('Please select a profile', 'error');
+    return;
+  }
+
+  if (!name) {
+    showToast('Field name is required', 'error');
+    return;
+  }
+
+  try {
+    const messageType = id ? 'UPDATE_RULE' : 'CREATE_RULE';
+    const data = { profileId, name, type, value, site, mode };
+    if (id) data.id = id;
+
+    const result = await sendMessage(messageType, data);
+
+    if (result.success) {
+      showToast(id ? 'Rule updated' : 'Rule created', 'success');
+      hideModal();
+      await loadAllRules();
+      await loadStats();
+    } else {
+      throw new Error(result.error || 'Failed to save rule');
+    }
+  } catch (error) {
+    console.error('Failed to save rule:', error);
+    showToast('Failed to save rule: ' + error.message, 'error');
+  }
+}
+
+async function handleDeleteRule(ruleId) {
+  const rule = cachedRules.find(r => r.id === ruleId);
+  if (!rule) return;
+
+  if (!confirm(`Are you sure you want to delete this rule for field "${rule.name}"?`)) {
+    return;
+  }
+
+  try {
+    const result = await sendMessage('DELETE_RULE', { id: ruleId });
+
+    if (result.success) {
+      showToast('Rule deleted', 'success');
+      await loadAllRules();
+      await loadStats();
+    } else {
+      throw new Error(result.error || 'Failed to delete rule');
+    }
+  } catch (error) {
+    console.error('Failed to delete rule:', error);
+    showToast('Failed to delete rule: ' + error.message, 'error');
+  }
+}
+
+// ============== MODAL HELPERS ==============
+
+function hideModal() {
+  document.getElementById('modal-overlay').classList.add('hidden');
+  document.getElementById('modal-profile').classList.add('hidden');
+  document.getElementById('modal-rule').classList.add('hidden');
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 // ============== INITIALIZATION ==============
 
 function setupEventListeners() {
@@ -267,12 +642,76 @@ function setupEventListeners() {
   document.getElementById('btn-export').addEventListener('click', handleExport);
   document.getElementById('btn-import').addEventListener('click', handleImportClick);
   document.getElementById('import-file').addEventListener('change', handleImport);
+
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+
+  // Profile management
+  document.getElementById('btn-add-profile').addEventListener('click', () => showProfileModal());
+  document.getElementById('btn-save-profile').addEventListener('click', handleSaveProfile);
+  document.getElementById('btn-cancel-profile').addEventListener('click', hideModal);
+
+  // Rule management
+  document.getElementById('btn-add-rule').addEventListener('click', () => showRuleModal());
+  document.getElementById('btn-save-rule').addEventListener('click', handleSaveRule);
+  document.getElementById('btn-cancel-rule').addEventListener('click', hideModal);
+
+  // Modal close buttons
+  document.querySelectorAll('.modal-close').forEach(btn => {
+    btn.addEventListener('click', hideModal);
+  });
+
+  // Close modal on overlay click
+  document.getElementById('modal-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'modal-overlay') {
+      hideModal();
+    }
+  });
+
+  // Close modal on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      hideModal();
+    }
+  });
+
+  // Delegated event handlers for edit/delete buttons
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+
+    const action = btn.dataset.action;
+    const id = btn.dataset.id;
+
+    switch (action) {
+      case 'edit-profile': {
+        const profile = cachedProfiles.find(p => p.id === id);
+        if (profile) showProfileModal(profile);
+        break;
+      }
+      case 'delete-profile':
+        handleDeleteProfile(id);
+        break;
+      case 'edit-rule': {
+        const rule = cachedRules.find(r => r.id === id);
+        if (rule) showRuleModal(rule);
+        break;
+      }
+      case 'delete-rule':
+        handleDeleteRule(id);
+        break;
+    }
+  });
 }
 
 async function init() {
   setupEventListeners();
   await loadAuthStatus();
   await loadSettings();
+  await loadProfiles();
+  await loadAllRules();
   await loadStats();
 }
 
