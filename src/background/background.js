@@ -224,63 +224,44 @@ async function generateCodeChallenge(verifier) {
 const OAuth = {
   async startAuthFlow() {
     try {
-      const codeVerifier = generateRandomString(64);
-      const codeChallenge = await generateCodeChallenge(codeVerifier);
       const state = generateRandomString(32);
+      await browser.storage.local.set({ _oauthState: state });
 
-      await browser.storage.local.set({ _oauthState: state, _codeVerifier: codeVerifier });
-
+      // Implicit Flow: response_type=token returns access_token directly
       const params = new URLSearchParams({
         client_id: OAUTH_CONFIG.clientId,
         redirect_uri: browser.identity.getRedirectURL(),
-        response_type: 'code',
+        response_type: 'token',
         scope: OAUTH_CONFIG.scopes.join(' '),
-        state: state,
-        code_challenge: codeChallenge,
-        code_challenge_method: 'S256',
-        access_type: 'offline',
-        prompt: 'consent'
+        state: state
       });
 
       const authUrl = `${OAUTH_CONFIG.authEndpoint}?${params.toString()}`;
       const redirectUrl = await browser.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
 
+      // Token is in URL fragment (after #), not query params
       const url = new URL(redirectUrl);
-      const code = url.searchParams.get('code');
-      const returnedState = url.searchParams.get('state');
-      const error = url.searchParams.get('error');
+      const hashParams = new URLSearchParams(url.hash.substring(1));
+
+      const accessToken = hashParams.get('access_token');
+      const expiresIn = hashParams.get('expires_in');
+      const returnedState = hashParams.get('state');
+      const error = hashParams.get('error');
 
       if (error) throw new Error(`Authorization error: ${error}`);
 
-      const { _oauthState, _codeVerifier } = await browser.storage.local.get(['_oauthState', '_codeVerifier']);
+      const { _oauthState } = await browser.storage.local.get(['_oauthState']);
       if (returnedState !== _oauthState) throw new Error('State mismatch');
 
-      const tokenParams = new URLSearchParams({
-        client_id: OAUTH_CONFIG.clientId,
-        code: code,
-        code_verifier: _codeVerifier,
-        grant_type: 'authorization_code',
-        redirect_uri: browser.identity.getRedirectURL()
-      });
+      if (!accessToken) throw new Error('No access token received');
 
-      const tokenResponse = await fetch(OAUTH_CONFIG.tokenEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: tokenParams.toString()
-      });
+      const expiresAt = Date.now() + (parseInt(expiresIn, 10) * 1000);
 
-      if (!tokenResponse.ok) {
-        const err = await tokenResponse.json();
-        throw new Error(`Token exchange failed: ${err.error_description || err.error}`);
-      }
-
-      const tokenData = await tokenResponse.json();
-      const expiresAt = Date.now() + (tokenData.expires_in * 1000);
-
+      // Get user email
       let userEmail = null;
       try {
         const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-          headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+          headers: { 'Authorization': `Bearer ${accessToken}` }
         });
         if (userResponse.ok) {
           const userInfo = await userResponse.json();
@@ -289,18 +270,18 @@ const OAuth = {
       } catch (e) { /* ignore */ }
 
       await Storage.updateAuth({
-        accessToken: tokenData.access_token,
-        refreshToken: tokenData.refresh_token,
+        accessToken: accessToken,
+        refreshToken: null, // Implicit flow doesn't provide refresh tokens
         tokenExpiresAt: expiresAt,
         userEmail: userEmail
       });
 
-      await browser.storage.local.remove(['_oauthState', '_codeVerifier']);
+      await browser.storage.local.remove(['_oauthState']);
       return { success: true, userEmail };
 
     } catch (error) {
       console.error('OAuth flow failed:', error);
-      await browser.storage.local.remove(['_oauthState', '_codeVerifier']);
+      await browser.storage.local.remove(['_oauthState']);
       throw error;
     }
   },
@@ -309,36 +290,13 @@ const OAuth = {
     const auth = await Storage.getAuth();
     if (!auth.accessToken) throw new Error('Not authenticated');
 
-    const needsRefresh = !auth.tokenExpiresAt || (Date.now() > auth.tokenExpiresAt - TOKEN_REFRESH_MARGIN_MS);
+    const isExpired = !auth.tokenExpiresAt || (Date.now() > auth.tokenExpiresAt - TOKEN_REFRESH_MARGIN_MS);
 
-    if (needsRefresh) {
-      if (!auth.refreshToken) throw new Error('No refresh token');
-
-      const params = new URLSearchParams({
-        client_id: OAUTH_CONFIG.clientId,
-        refresh_token: auth.refreshToken,
-        grant_type: 'refresh_token'
-      });
-
-      const response = await fetch(OAUTH_CONFIG.tokenEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params.toString()
-      });
-
-      if (!response.ok) {
-        await Storage.clearAuth();
-        throw new Error('Session expired');
-      }
-
-      const tokenData = await response.json();
-      await Storage.updateAuth({
-        accessToken: tokenData.access_token,
-        tokenExpiresAt: Date.now() + (tokenData.expires_in * 1000),
-        refreshToken: tokenData.refresh_token || auth.refreshToken
-      });
-
-      return tokenData.access_token;
+    if (isExpired) {
+      // Implicit Flow doesn't provide refresh tokens
+      // User needs to re-authenticate
+      await Storage.clearAuth();
+      throw new Error('Session expired. Please reconnect your Google account.');
     }
 
     return auth.accessToken;

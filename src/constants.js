@@ -5,9 +5,8 @@
 // Google OAuth2 configuration
 // NOTE: Replace these with your actual Google Cloud Console credentials
 export const OAUTH_CONFIG = {
-  clientId: '1058799799273-l91bh2agp2h8n6p167rd8cfdlg5a2uis.apps.googleusercontent.com',
-  // For Firefox extensions, we use the identity API redirect
-  redirectUri: 'https://497229dae2a2309ae9b8ff995b389ebd037fef2a.extensions.allizom.org/',
+  clientId: '1058799799273-ctv4k99li40ni994ku5fdmv7q2hrrsaf.apps.googleusercontent.com',
+  // No clientSecret needed - using PKCE flow for public clients
   authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
   tokenEndpoint: 'https://oauth2.googleapis.com/token',
   revokeEndpoint: 'https://oauth2.googleapis.com/revoke',
