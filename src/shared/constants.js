@@ -6,7 +6,6 @@
 // NOTE: Replace these with your actual Google Cloud Console credentials
 export const OAUTH_CONFIG = {
   clientId: '1058799799273-ctv4k99li40ni994ku5fdmv7q2hrrsaf.apps.googleusercontent.com',
-  // No clientSecret needed - using PKCE flow for public clients
   authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
   tokenEndpoint: 'https://oauth2.googleapis.com/token',
   revokeEndpoint: 'https://oauth2.googleapis.com/revoke',
