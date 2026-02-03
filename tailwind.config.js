@@ -1,7 +1,13 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
+    // Scan all HTML and JS files in src directory recursively
     "./src/**/*.{html,js}",
+    // Specifically include the new component directories
+    "./src/app/**/*.{html,js}",
+    "./src/ui/**/*.{html,js}",
+    "./src/core/**/*.js",
+    "./src/shared/**/*.js",
   ],
   darkMode: 'media',
   theme: {

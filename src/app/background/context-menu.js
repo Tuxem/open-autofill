@@ -3,7 +3,7 @@
  * Creates right-click menu items for saving form data
  */
 
-import { CONTEXT_MENU_IDS, MESSAGE_TYPES } from '../constants.js';
+import { CONTEXT_MENU_IDS, MESSAGE_TYPES } from '../../shared/constants.js';
 
 // Initialize context menus
 async function init() {

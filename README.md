@@ -52,7 +52,7 @@ A Firefox extension (Manifest V3) for automatic form filling with bi-directional
      - Find "Open Autofill" and click "Inspect" (this opens the background page console)
      - Look for the log message: `Extension Redirect URI: ...`
    - Add this URI to the "Authorized redirect URIs" in your Google Cloud Console credentials
-   - Update `src/constants.js` with your client ID
+   - Update `src/shared/constants.js` with your client ID
 
 3. **Extension ID**:
    - The extension ID is configured in `manifest.json` under `browser_specific_settings.gecko.id`.
@@ -140,31 +140,76 @@ npm run watch:css
 
 ```
 open-autofill/
-├── manifest.json           # Extension manifest (MV3)
-├── Dockerfile              # Docker build configuration
-├── build.sh                # Build script (Docker or npm)
-├── package.json            # npm dependencies
-├── tailwind.config.js      # Tailwind CSS configuration
-├── src/
-│   ├── background/         # Service worker scripts
-│   ├── content/            # Content scripts
-│   ├── ui/                 # UI components (floating bar)
-│   ├── options/            # Options page
-│   ├── styles/             # CSS sources and output
-│   │   ├── input.css       # Tailwind source
-│   │   └── output.css      # Generated CSS (built)
-│   ├── lib/                # Shared utilities
-│   └── constants.js        # Configuration constants
-├── icons/                  # Extension icons
-└── tests/                  # Test files
+├── manifest.json             # Extension manifest (MV3)
+├── Dockerfile                # Docker build configuration
+├── build.sh                  # Build script (Docker or npm)
+├── package.json              # npm dependencies
+├── tailwind.config.js        # Tailwind CSS configuration
+├── icons/                    # Extension icons
+└── src/
+    ├── core/                 # Business logic (UI-independent)
+    │   ├── storage/
+    │   │   └── storage.js    # Storage abstraction layer
+    │   ├── network/
+    │   │   ├── messaging.js  # Browser messaging utilities
+    │   │   ├── oauth.js      # Google OAuth2 with PKCE
+    │   │   └── sync.js       # Google Sheets synchronization
+    │   └── logic/
+    │       ├── form-detector.js    # Form detection engine
+    │       ├── field-extractor.js  # Field data extraction
+    │       ├── form-filler.js      # Form filling engine
+    │       └── event-dispatcher.js # DOM event simulation
+    │
+    ├── app/                  # Extension entry points
+    │   ├── background/
+    │   │   ├── background.js # Service worker orchestrator
+    │   │   ├── alarms.js     # Periodic sync scheduling
+    │   │   └── context-menu.js # Right-click menu actions
+    │   ├── content/
+    │   │   ├── content.js    # Content script entry point
+    │   │   └── mutation-watcher.js # SPA DOM observer
+    │   └── options/
+    │       ├── options.html  # Options page HTML
+    │       ├── options.js    # Options page orchestrator
+    │       └── components/   # Modular UI components
+    │           ├── auth-section.js      # Google auth UI
+    │           ├── settings-section.js  # Settings & sync UI
+    │           ├── profiles-view.js     # Profile CRUD
+    │           ├── rules-view.js        # Rules CRUD
+    │           ├── data-section.js      # Import/Export
+    │           ├── modal-manager.js     # Modal dialogs
+    │           ├── search-pagination.js # Search & paging
+    │           └── toast.js             # Toast notifications
+    │
+    ├── ui/                   # Reusable UI components
+    │   ├── components/
+    │   │   ├── floating-bar.js  # Floating action bar
+    │   │   └── save-dialog.js   # Save form dialog
+    │   └── styles/
+    │       ├── input.css     # Tailwind source
+    │       └── output.css    # Generated CSS (built)
+    │
+    └── shared/               # Cross-cutting utilities
+        ├── constants.js      # Configuration & constants
+        └── utils.js          # Shared helper functions
 ```
+
+### Architecture Overview
+
+The codebase follows a **component-based architecture** with strict separation of concerns:
+
+- **`core/`** - Pure business logic with no UI dependencies. Can be tested independently.
+- **`app/`** - Extension entry points that wire together core logic and UI.
+- **`ui/`** - Reusable interface components (Shadow DOM isolated).
+- **`shared/`** - Utilities and constants used across all layers.
 
 ### Key Files
 
-- `background/background.js` - Service worker orchestration (OAuth, sync, messaging)
-- `content/form-filler.js` - Form filling engine
-- `ui/floating-bar.js` - Floating UI component
-- `options/options.js` - Options page with profile/rule management
+- `src/app/background/background.js` - Service worker orchestrating OAuth, sync, and messaging
+- `src/core/logic/form-filler.js` - Form filling engine with multi-type support
+- `src/core/network/sync.js` - Bi-directional Google Sheets synchronization
+- `src/ui/components/floating-bar.js` - Floating UI with profile selection
+- `src/app/options/options.js` - Options page entry point (imports component modules)
 
 ### Development Workflow
 

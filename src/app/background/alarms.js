@@ -2,8 +2,8 @@
  * Alarms module for scheduling sync operations
  */
 
-import { Storage } from '../lib/storage.js';
-import { Sync } from './sync.js';
+import { Storage } from '../../core/storage/storage.js';
+import { Sync } from '../../core/network/sync.js';
 
 const SYNC_ALARM_NAME = 'open-autofill-sync';
 

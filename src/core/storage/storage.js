@@ -8,7 +8,7 @@ import {
   DEFAULT_SETTINGS,
   DEFAULT_SYNC_STATE,
   DEFAULT_AUTH
-} from '../constants.js';
+} from '../../shared/constants.js';
 
 // Initialize storage with default values if empty
 async function initStorage() {

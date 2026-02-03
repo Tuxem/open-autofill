@@ -3,8 +3,8 @@
  * Handles bi-directional sync between local storage and Google Sheets
  */
 
-import { SHEETS_API, SHEET_HEADERS, SYNC_RETRY } from '../constants.js';
-import { Storage } from '../lib/storage.js';
+import { SHEETS_API, SHEET_HEADERS, SYNC_RETRY } from '../../shared/constants.js';
+import { Storage } from '../storage/storage.js';
 import { OAuth } from './oauth.js';
 
 // Make an authenticated request to Google Sheets API

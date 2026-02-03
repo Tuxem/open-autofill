@@ -17,4 +17,4 @@ RUN npm run build:css
 
 # Output stage - just the built extension files
 FROM scratch AS export
-COPY --from=builder /app/src/styles/output.css /src/styles/output.css
+COPY --from=builder /app/src/ui/styles/output.css /src/ui/styles/output.css

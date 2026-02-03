@@ -3,8 +3,8 @@
  * Implements OAuth2 with PKCE for Firefox extensions
  */
 
-import { OAUTH_CONFIG, TOKEN_REFRESH_MARGIN_MS } from '../constants.js';
-import { Storage } from '../lib/storage.js';
+import { OAUTH_CONFIG, TOKEN_REFRESH_MARGIN_MS } from '../../shared/constants.js';
+import { Storage } from '../storage/storage.js';
 
 // Generate random string for PKCE
 function generateRandomString(length) {

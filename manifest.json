@@ -19,7 +19,7 @@
   ],
 
   "background": {
-    "scripts": ["src/background/background.js"],
+    "scripts": ["src/app/background/background.js"],
     "type": "module"
   },
 
@@ -27,16 +27,16 @@
     {
       "matches": ["<all_urls>"],
       "js": [
-        "src/lib/utils.js",
-        "src/lib/messaging.js",
-        "src/content/event-dispatcher.js",
-        "src/content/form-detector.js",
-        "src/content/form-filler.js",
-        "src/content/field-extractor.js",
-        "src/content/mutation-watcher.js",
-        "src/ui/floating-bar.js",
-        "src/ui/save-dialog.js",
-        "src/content/content.js"
+        "src/shared/utils.js",
+        "src/core/network/messaging.js",
+        "src/core/logic/event-dispatcher.js",
+        "src/core/logic/form-detector.js",
+        "src/core/logic/form-filler.js",
+        "src/core/logic/field-extractor.js",
+        "src/app/content/mutation-watcher.js",
+        "src/ui/components/floating-bar.js",
+        "src/ui/components/save-dialog.js",
+        "src/app/content/content.js"
       ],
       "css": [],
       "run_at": "document_idle"
@@ -44,7 +44,7 @@
   ],
 
   "options_ui": {
-    "page": "src/options/options.html",
+    "page": "src/app/options/options.html",
     "open_in_tab": true
   },
 
