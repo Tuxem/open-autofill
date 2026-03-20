@@ -34,10 +34,10 @@
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         padding: 8px 12px;
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 10px;
-        min-width: 300px;
-        max-width: 500px;
+        min-width: 280px;
+        max-width: 400px;
       }
 
       .floating-bar.hidden { display: none; }
@@ -53,51 +53,50 @@
         height: 100%;
       }
 
+      .floating-bar__profile-selector {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
       .floating-bar__search {
-        flex: 0 0 100px;
+        width: 100%;
         padding: 6px 10px;
         border: 1px solid #ddd;
         border-radius: 4px;
         font-size: 13px;
         outline: none;
+        box-sizing: border-box;
         transition: border-color 0.2s;
       }
 
       .floating-bar__search:focus { border-color: #4a90d9; }
       .floating-bar__search::placeholder { color: #999; }
 
-      .floating-bar__select-wrapper {
-        flex: 1;
-        position: relative;
-      }
-
       .floating-bar__select {
         width: 100%;
-        padding: 6px 28px 6px 10px;
+        padding: 4px;
         border: 1px solid #ddd;
         border-radius: 4px;
         font-size: 13px;
         background: white;
         cursor: pointer;
         outline: none;
-        appearance: none;
-        transition: border-color 0.2s;
+        box-sizing: border-box;
       }
 
       .floating-bar__select:focus { border-color: #4a90d9; }
 
-      .floating-bar__select-wrapper::after {
-        content: '';
-        position: absolute;
-        right: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 0;
-        height: 0;
-        border-left: 5px solid transparent;
-        border-right: 5px solid transparent;
-        border-top: 5px solid #666;
-        pointer-events: none;
+      .floating-bar__select option {
+        padding: 5px 8px;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+
+      .floating-bar__select option:checked {
+        background: #4a90d9;
+        color: white;
       }
 
       .floating-bar__btn {
@@ -112,14 +111,6 @@
       }
 
       .floating-bar__btn:active { transform: scale(0.98); }
-
-      .floating-bar__btn--fill {
-        background: #4a90d9;
-        color: white;
-      }
-
-      .floating-bar__btn--fill:hover { background: #3a7bc8; }
-      .floating-bar__btn--fill:disabled { background: #ccc; cursor: not-allowed; }
 
       .floating-bar__btn--save {
         background: #5cb85c;
@@ -182,6 +173,11 @@
           color: #e0e0e0;
         }
 
+        .floating-bar__select option:checked {
+          background: #3a7bc8;
+          color: white;
+        }
+
         .floating-bar__btn--close {
           color: #aaa;
         }
@@ -235,13 +231,10 @@
             <path d="M7 9h10M7 13h6" stroke="#4a90d9" stroke-width="2" stroke-linecap="round"/>
           </svg>
         </div>
-        <input type="text" class="floating-bar__search" placeholder="Filter..." />
-        <div class="floating-bar__select-wrapper">
-          <select class="floating-bar__select">
-            <option value="">Select profile...</option>
-          </select>
+        <div class="floating-bar__profile-selector">
+          <input type="text" class="floating-bar__search" placeholder="Search profiles..." />
+          <select class="floating-bar__select" size="4"></select>
         </div>
-        <button class="floating-bar__btn floating-bar__btn--fill" disabled>Fill</button>
         <button class="floating-bar__btn floating-bar__btn--save">Save</button>
         <span class="floating-bar__status" style="display:none;"></span>
         <button class="floating-bar__btn floating-bar__btn--close">&times;</button>
@@ -250,13 +243,11 @@
       // Attach event listeners
       const searchInput = bar.querySelector('.floating-bar__search');
       const select = bar.querySelector('.floating-bar__select');
-      const fillBtn = bar.querySelector('.floating-bar__btn--fill');
       const saveBtn = bar.querySelector('.floating-bar__btn--save');
       const closeBtn = bar.querySelector('.floating-bar__btn--close');
 
       searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
       select.addEventListener('change', (e) => this.handleProfileSelect(e.target.value));
-      fillBtn.addEventListener('click', () => this.handleFill());
       saveBtn.addEventListener('click', () => this.handleSave());
       closeBtn.addEventListener('click', () => this.hide());
 
@@ -329,14 +320,13 @@
       );
 
       // Build options HTML
-      let html = '<option value="">Select profile...</option>';
-
+      let html = '';
       for (const profile of filteredProfiles) {
         const hotkey = profile.hotkey ? ` (${profile.hotkey})` : '';
         html += `<option value="${profile.id}">${this.escapeHtml(profile.name)}${hotkey}</option>`;
       }
 
-      select.innerHTML = html;
+      select.innerHTML = html || '<option value="" disabled>No profiles found</option>';
 
       // Restore selection if still valid
       if (this.selectedProfileId) {
@@ -345,7 +335,6 @@
           select.value = this.selectedProfileId;
         } else {
           this.selectedProfileId = null;
-          this.updateFillButton();
         }
       }
     },
@@ -356,16 +345,12 @@
       this.updateProfileDropdown();
     },
 
-    // Handle profile selection
+    // Handle profile selection — auto-fill immediately
     handleProfileSelect(profileId) {
       this.selectedProfileId = profileId || null;
-      this.updateFillButton();
-    },
-
-    // Update fill button state
-    updateFillButton() {
-      const fillBtn = this.shadowRoot.querySelector('.floating-bar__btn--fill');
-      fillBtn.disabled = !this.selectedProfileId;
+      if (this.selectedProfileId) {
+        this.handleFill();
+      }
     },
 
     // Handle fill button click

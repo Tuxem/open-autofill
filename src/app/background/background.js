@@ -195,6 +195,7 @@ async function handleMessage(message, sender) {
       await Storage.saveProfile(profile);
 
       // Create rules for each field
+      const rules = [];
       for (const field of data.fields) {
         const rule = {
           id: generateRuleId(),
@@ -206,23 +207,28 @@ async function handleMessage(message, sender) {
           profileId: profile.id
         };
         await Storage.saveRule(rule);
+        rules.push(rule);
+      }
 
-        // Queue for sync
-        try {
-          await Sync.pushRule(rule);
-        } catch (e) {
-          console.warn('Failed to push rule to sheets:', e);
-          await Sync.queueWrite('rule', rule.id);
+      // Respond immediately — sync happens in the background (fire-and-forget)
+      // This avoids blocking the message port on slow/failed network calls,
+      // which would prevent the save dialog from closing in the content script.
+      (async () => {
+        for (const rule of rules) {
+          try {
+            await Sync.pushRule(rule);
+          } catch (e) {
+            console.warn('Failed to push rule to sheets:', e);
+            await Sync.queueWrite('rule', rule.id);
+          }
         }
-      }
-
-      // Push profile to sheets
-      try {
-        await Sync.pushProfile(profile);
-      } catch (e) {
-        console.warn('Failed to push profile to sheets:', e);
-        await Sync.queueWrite('profile', profile.id);
-      }
+        try {
+          await Sync.pushProfile(profile);
+        } catch (e) {
+          console.warn('Failed to push profile to sheets:', e);
+          await Sync.queueWrite('profile', profile.id);
+        }
+      })();
 
       return { success: true, profile };
     }
