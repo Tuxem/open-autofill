@@ -12,6 +12,7 @@
     isVisible: false,
     extractedFields: [],
     existingProfiles: [],
+    profileSearchText: '',
 
     styles: `
       :host {
@@ -114,6 +115,21 @@
       .save-dialog__select:focus {
         outline: none;
         border-color: #4a90d9;
+      }
+
+      select.save-dialog__select[size] {
+        padding: 4px;
+        height: auto;
+      }
+
+      select.save-dialog__select[size] option {
+        padding: 6px 8px;
+        border-radius: 3px;
+      }
+
+      select.save-dialog__select[size] option:checked {
+        background: #4a90d9;
+        color: white;
       }
 
       .save-dialog__radio-group {
@@ -249,6 +265,11 @@
           color: #e0e0e0;
         }
 
+        select.save-dialog__select[size] option:checked {
+          background: #3a7bc8;
+          color: white;
+        }
+
         .save-dialog__fields-list {
           border-color: #444;
         }
@@ -322,7 +343,8 @@
 
               <div id="existing-profile-section" style="display:none;">
                 <label class="save-dialog__label">Select profile</label>
-                <select class="save-dialog__select" id="profile-select">
+                <input type="text" class="save-dialog__input" id="profile-search-input" placeholder="Search profiles..." style="margin-bottom:6px;" />
+                <select class="save-dialog__select" id="profile-select" size="4">
                   <option value="">Select...</option>
                 </select>
               </div>
@@ -358,6 +380,12 @@
         radio.addEventListener('change', (e) => this.handleModeChange(e.target.value));
       });
 
+      // Profile search input
+      overlay.querySelector('#profile-search-input').addEventListener('input', (e) => {
+        this.profileSearchText = e.target.value;
+        this.updateProfileSelect();
+      });
+
       this.shadowRoot.appendChild(overlay);
     },
 
@@ -377,18 +405,40 @@
       // Load existing profiles
       await this.loadProfiles();
 
+      // Reset state
+      this.profileSearchText = '';
+      const searchInput = this.shadowRoot.querySelector('#profile-search-input');
+      if (searchInput) searchInput.value = '';
+
       // Update UI
       this.updateFieldsList();
-      this.updateProfileSelect();
+
+      // Pre-select existing profile if floating bar has one selected
+      const preSelectedId = window.OpenAutofillFloatingBar?.selectedProfileId;
+      if (preSelectedId && this.existingProfiles.find(p => p.id === preSelectedId)) {
+        const existingRadio = this.shadowRoot.querySelector('input[name="save-mode"][value="existing"]');
+        existingRadio.checked = true;
+        this.handleModeChange('existing');
+        this.updateProfileSelect(preSelectedId);
+      } else {
+        const newRadio = this.shadowRoot.querySelector('input[name="save-mode"][value="new"]');
+        newRadio.checked = true;
+        this.handleModeChange('new');
+        this.updateProfileSelect();
+      }
 
       // Show overlay
       const overlay = this.shadowRoot.querySelector('.save-dialog-overlay');
       overlay.classList.remove('hidden');
       this.isVisible = true;
 
-      // Focus the profile name input
-      const nameInput = this.shadowRoot.querySelector('#profile-name-input');
-      setTimeout(() => nameInput.focus(), 100);
+      // Focus the appropriate input
+      if (window.OpenAutofillFloatingBar?.selectedProfileId) {
+        setTimeout(() => this.shadowRoot.querySelector('#profile-search-input')?.focus(), 100);
+      } else {
+        const nameInput = this.shadowRoot.querySelector('#profile-name-input');
+        setTimeout(() => nameInput.focus(), 100);
+      }
     },
 
     // Hide the dialog
@@ -459,15 +509,25 @@
     },
 
     // Update profile select dropdown
-    updateProfileSelect() {
+    updateProfileSelect(selectedId = null) {
       const select = this.shadowRoot.querySelector('#profile-select');
-      let html = '<option value="">Select...</option>';
+      const searchLower = this.profileSearchText.toLowerCase();
 
-      for (const profile of this.existingProfiles) {
+      const filtered = this.existingProfiles.filter(p =>
+        !searchLower || p.name.toLowerCase().includes(searchLower)
+      );
+
+      let html = '';
+      for (const profile of filtered) {
         html += `<option value="${profile.id}">${this.escapeHtml(profile.name)}</option>`;
       }
 
-      select.innerHTML = html;
+      select.innerHTML = html || '<option value="" disabled>No profiles found</option>';
+
+      if (selectedId) {
+        const option = select.querySelector(`option[value="${selectedId}"]`);
+        if (option) select.value = selectedId;
+      }
     },
 
     // Handle save button click
