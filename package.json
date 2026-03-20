@@ -1,11 +1,16 @@
 {
   "name": "open-autofill",
   "version": "1.0.0",
-  "description": "Firefox extension for automatic form filling with Google Sheets sync",
+  "description": "Browser extension for automatic form filling with Google Sheets sync",
   "scripts": {
     "build:css": "tailwindcss -i ./src/ui/styles/input.css -o ./src/ui/styles/output.css --minify",
     "watch:css": "tailwindcss -i ./src/ui/styles/input.css -o ./src/ui/styles/output.css --watch",
-    "build": "npm run build:css"
+    "build": "npm run build:css && node scripts/build.js",
+    "build:firefox": "npm run build:css && node scripts/build.js firefox",
+    "build:chrome": "npm run build:css && node scripts/build.js chrome",
+    "pack:firefox": "npm run build:firefox && cd dist/firefox && zip -r ../open-autofill-firefox.zip .",
+    "pack:chrome": "npm run build:chrome && cd dist/chrome && zip -r ../open-autofill-chrome.zip .",
+    "pack": "npm run build && cd dist/firefox && zip -r ../open-autofill-firefox.zip . && cd ../chrome && zip -r ../open-autofill-chrome.zip ."
   },
   "devDependencies": {
     "tailwindcss": "^3.4.1"

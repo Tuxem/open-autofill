@@ -5,7 +5,7 @@
 // Google OAuth2 configuration
 // NOTE: Replace these with your actual Google Cloud Console credentials
 export const OAUTH_CONFIG = {
-  clientId: '1058799799273-ctv4k99li40ni994ku5fdmv7q2hrrsaf.apps.googleusercontent.com',
+  clientId: '387270148042-2cbn8vf87fuc59vcebk13optdkfv9nfq.apps.googleusercontent.com',
   authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
   tokenEndpoint: 'https://oauth2.googleapis.com/token',
   revokeEndpoint: 'https://oauth2.googleapis.com/revoke',

@@ -3,6 +3,8 @@
  * Orchestrates OAuth, sync, alarms, and messaging
  */
 
+import '../../shared/browser-polyfill.js';
+
 import {
   MESSAGE_TYPES,
   CONTEXT_MENU_IDS

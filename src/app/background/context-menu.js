@@ -11,14 +11,14 @@ async function init() {
   await browser.contextMenus.removeAll();
 
   // Create "Save form" menu item (always visible)
-  browser.contextMenus.create({
+  await browser.contextMenus.create({
     id: CONTEXT_MENU_IDS.SAVE_FORM,
     title: 'Save entire form to Open Autofill',
     contexts: ['page', 'frame', 'editable']
   });
 
   // Create "Save this field" menu item (visible on form fields)
-  browser.contextMenus.create({
+  await browser.contextMenus.create({
     id: CONTEXT_MENU_IDS.SAVE_FIELD,
     title: 'Save this field to Open Autofill',
     contexts: ['editable']
