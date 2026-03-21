@@ -57,10 +57,13 @@ function buildFirefoxManifest(base) {
   const manifest = { ...base };
 
   // Ensure polyfill is first content script (no-op on Firefox, but keeps parity)
-  manifest.content_scripts = base.content_scripts.map(cs => ({
-    ...cs,
-    js: ['src/shared/browser-polyfill.js', ...cs.js],
-  }));
+  manifest.content_scripts = base.content_scripts.map(cs => {
+    const js = [...cs.js];
+    if (!js.includes('src/shared/browser-polyfill.js')) {
+      js.unshift('src/shared/browser-polyfill.js');
+    }
+    return { ...cs, js };
+  });
 
   return manifest;
 }
@@ -78,10 +81,13 @@ function buildChromeManifest(base) {
   delete manifest.browser_specific_settings;
 
   // Ensure polyfill is first content script
-  manifest.content_scripts = base.content_scripts.map(cs => ({
-    ...cs,
-    js: ['src/shared/browser-polyfill.js', ...cs.js],
-  }));
+  manifest.content_scripts = base.content_scripts.map(cs => {
+    const js = [...cs.js];
+    if (!js.includes('src/shared/browser-polyfill.js')) {
+      js.unshift('src/shared/browser-polyfill.js');
+    }
+    return { ...cs, js };
+  });
 
   return manifest;
 }

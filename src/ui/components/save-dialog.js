@@ -303,7 +303,7 @@
 
       this.container = document.createElement('div');
       this.container.id = 'open-autofill-save-dialog';
-      this.shadowRoot = this.container.attachShadow({ mode: 'closed' });
+      this.shadowRoot = this.container.attachShadow({ mode: 'open' });
 
       const styleEl = document.createElement('style');
       styleEl.textContent = this.styles;

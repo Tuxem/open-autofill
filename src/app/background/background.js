@@ -18,23 +18,6 @@ import { ContextMenu } from './context-menu.js';
 
 // ============== HELPER FUNCTIONS ==============
 
-function urlMatchesPattern(url, pattern) {
-  if (!pattern) return true;
-  try {
-    const current = new URL(url);
-    const patternUrl = pattern.includes('://') ? new URL(pattern) : new URL('https://' + pattern);
-    const currentHost = current.hostname.toLowerCase();
-    const patternHost = patternUrl.hostname.toLowerCase();
-    if (currentHost !== patternHost && !currentHost.endsWith('.' + patternHost)) return false;
-    if (patternUrl.pathname && patternUrl.pathname !== '/') {
-      if (!current.pathname.startsWith(patternUrl.pathname)) return false;
-    }
-    return true;
-  } catch (e) {
-    return url.includes(pattern);
-  }
-}
-
 function urlMatches(currentUrl, pattern) {
   if (!pattern) return true;
   try {
@@ -69,6 +52,32 @@ function generateRuleId() {
 }
 
 // ============== LIFECYCLE EVENTS ==============
+
+// Re-authenticate if the user had Google Sheets configured but is no longer authenticated,
+// then trigger a full sync.
+async function checkAuthAndSync() {
+  try {
+    const settings = await Storage.getSettings();
+    if (!settings.sheetId) return; // Sheets sync not configured, nothing to do
+
+    const isAuthenticated = await Storage.isAuthenticated();
+    if (!isAuthenticated) {
+      console.log('Open Autofill: session expired, re-opening auth flow');
+      try {
+        await OAuth.startAuthFlow();
+        console.log('Open Autofill: re-authenticated successfully');
+      } catch (error) {
+        console.warn('Open Autofill: re-auth failed:', error);
+        return; // Do not attempt sync if auth failed
+      }
+    }
+
+    await Sync.fullSync();
+    console.log('Open Autofill: startup sync complete');
+  } catch (error) {
+    console.warn('Open Autofill: startup sync failed:', error);
+  }
+}
 
 // Initialize extension on install/update
 browser.runtime.onInstalled.addListener(async (details) => {
@@ -107,12 +116,19 @@ browser.alarms.onAlarm.addListener((alarm) => {
 
 // Handle browser action click (show floating bar in active tab)
 browser.action.onClicked.addListener(async (tab) => {
+  // Re-auth if session expired, then sync — fire-and-forget so the bar shows immediately
+  checkAuthAndSync();
+
+  if (!tab.id) return;
+
   try {
+    // Check if we can access the tab (restricted pages like chrome:// settings will throw)
     await browser.tabs.sendMessage(tab.id, {
       type: MESSAGE_TYPES.SHOW_FLOATING_BAR
     });
   } catch (error) {
-    console.error('Failed to show floating bar:', error);
+    console.warn('Could not send message to tab:', tab.id, error);
+    // Expected on restricted pages (chrome://, about:, extension pages, etc.)
   }
 });
 

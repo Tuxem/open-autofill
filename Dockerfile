@@ -6,15 +6,14 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Install dependencies
-RUN npm ci --only=production=false
+RUN npm ci
 
 # Copy source files
-COPY tailwind.config.js ./
-COPY src/ ./src/
+COPY . .
 
-# Build CSS
-RUN npm run build:css
+# Build CSS and browser packages
+RUN npm run build
 
-# Output stage - just the built extension files
+# Export stage
 FROM scratch AS export
-COPY --from=builder /app/src/ui/styles/output.css /src/ui/styles/output.css
+COPY --from=builder /app/dist /dist

@@ -8,7 +8,8 @@
     "storage",
     "alarms",
     "contextMenus",
-    "identity"
+    "identity",
+    "activeTab"
   ],
 
   "host_permissions": [
@@ -27,6 +28,7 @@
     {
       "matches": ["<all_urls>"],
       "js": [
+        "src/shared/browser-polyfill.js",
         "src/shared/utils.js",
         "src/core/network/messaging.js",
         "src/core/logic/event-dispatcher.js",

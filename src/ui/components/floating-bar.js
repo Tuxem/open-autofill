@@ -203,7 +203,7 @@
       // Create container with Shadow DOM
       this.container = document.createElement('div');
       this.container.id = 'open-autofill-floating-bar';
-      this.shadowRoot = this.container.attachShadow({ mode: 'closed' });
+      this.shadowRoot = this.container.attachShadow({ mode: 'open' });
 
       // Inject styles
       const styleEl = document.createElement('style');
@@ -260,13 +260,13 @@
         this.init();
       }
 
-      // Load profiles
-      await this.loadProfiles();
-
-      // Update visibility
+      // Update visibility immediately
       const bar = this.shadowRoot.querySelector('.floating-bar');
       bar.classList.remove('hidden');
       this.isVisible = true;
+
+      // Load profiles (async)
+      this.loadProfiles();
 
       // Focus the search input
       const searchInput = this.shadowRoot.querySelector('.floating-bar__search');
