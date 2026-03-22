@@ -9,7 +9,8 @@
     "alarms",
     "contextMenus",
     "identity",
-    "activeTab"
+    "activeTab",
+    "scripting"
   ],
 
   "host_permissions": [

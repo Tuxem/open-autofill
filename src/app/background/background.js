@@ -116,19 +116,49 @@ browser.alarms.onAlarm.addListener((alarm) => {
 
 // Handle browser action click (show floating bar in active tab)
 browser.action.onClicked.addListener(async (tab) => {
-  // Re-auth if session expired, then sync — fire-and-forget so the bar shows immediately
-  checkAuthAndSync();
-
   if (!tab.id) return;
 
+  // 1. Re-auth if session expired, then sync — wait if we need to show the bar after
+  await checkAuthAndSync();
+
   try {
-    // Check if we can access the tab (restricted pages like chrome:// settings will throw)
+    // 2. Try to send message to show the bar
     await browser.tabs.sendMessage(tab.id, {
       type: MESSAGE_TYPES.SHOW_FLOATING_BAR
     });
   } catch (error) {
-    console.warn('Could not send message to tab:', tab.id, error);
-    // Expected on restricted pages (chrome://, about:, extension pages, etc.)
+    // 3. If "Receiving end does not exist", it means content script is not injected.
+    // This happens if the extension was reloaded and the page was not refreshed.
+    if (error.message.includes('Could not establish connection') || error.message.includes('Receiving end does not exist')) {
+      console.log('Content script missing, attempting to inject into tab:', tab.id);
+      
+      try {
+        // Manually inject the content scripts defined in manifest.json
+        const manifest = browser.runtime.getManifest();
+        const scripts = manifest.content_scripts[0].js;
+        
+        await browser.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: scripts
+        });
+
+        // Try sending the message again after a short delay
+        setTimeout(async () => {
+          try {
+            await browser.tabs.sendMessage(tab.id, {
+              type: MESSAGE_TYPES.SHOW_FLOATING_BAR
+            });
+          } catch (retryError) {
+            console.error('Failed to show floating bar after injection:', retryError);
+          }
+        }, 100);
+
+      } catch (injectError) {
+        console.warn('Could not inject content script (expected on restricted pages like chrome://):', injectError);
+      }
+    } else {
+      console.warn('Could not send message to tab:', tab.id, error);
+    }
   }
 });
 
