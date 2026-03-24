@@ -76,7 +76,7 @@
       // Use the appropriate setter
       if (element.tagName === 'TEXTAREA' && textareaValueSetter) {
         textareaValueSetter.call(element, value);
-      } else if (inputValueSetter) {
+      } else if (element.tagName === 'INPUT' && inputValueSetter) {
         inputValueSetter.call(element, value);
       } else if (prototypeValueSetter) {
         prototypeValueSetter.call(element, value);
