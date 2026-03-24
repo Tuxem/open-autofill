@@ -87,6 +87,22 @@
       // Check if has dimensions
       const rect = element.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) {
+        // CSS-styled radio/checkbox: the native input may be hidden while the
+        // associated label provides the visible, interactive UI. Accept if the
+        // label is present and visible.
+        const inputType = (element.type || '').toLowerCase();
+        if ((inputType === 'radio' || inputType === 'checkbox') && element.id) {
+          const label = document.querySelector(`label[for="${CSS.escape(element.id)}"]`);
+          if (label) {
+            const labelRect = label.getBoundingClientRect();
+            if (labelRect.width > 0 && labelRect.height > 0) {
+              const labelStyle = window.getComputedStyle(label);
+              if (labelStyle.display !== 'none' && labelStyle.visibility !== 'hidden') {
+                return true;
+              }
+            }
+          }
+        }
         return false;
       }
 

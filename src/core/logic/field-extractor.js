@@ -43,7 +43,7 @@
           const checked = group.find(r => r.checked);
 
           extracted.push({
-            name: detector.getFieldIdentifier(field),
+            name: field.name,
             type: 'Radio',
             label: detector.getFieldLabel(field),
             value: checked ? checked.value : ''
@@ -86,7 +86,7 @@
         const checked = group.find(r => r.checked);
 
         return {
-          name: detector.getFieldIdentifier(element),
+          name: element.name || detector.getFieldIdentifier(element),
           type: 'Radio',
           label: detector.getFieldLabel(element),
           value: checked ? checked.value : ''
@@ -174,7 +174,12 @@
       const uniqueFields = new Map();
 
       for (const field of allFields) {
-        const identifier = detector.getFieldIdentifier(field);
+        const type = detector.getFieldType(field);
+
+        // For radio buttons, deduplicate by group name (not individual element id)
+        const identifier = (type === 'Radio' && field.name)
+          ? field.name
+          : detector.getFieldIdentifier(field);
 
         // Only keep the first field with each identifier
         if (!uniqueFields.has(identifier)) {

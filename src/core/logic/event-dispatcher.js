@@ -267,6 +267,19 @@
       return optionFound;
     },
 
+    // Click a radio/checkbox element, falling back to its label for CSS-hidden inputs
+    clickToggleElement(element) {
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0 && element.id) {
+        const label = document.querySelector(`label[for="${CSS.escape(element.id)}"]`);
+        if (label) {
+          this.dispatchMouseEvent(label, 'click');
+          return;
+        }
+      }
+      this.dispatchMouseEvent(element, 'click');
+    },
+
     // Fill a checkbox
     fillCheckbox(element, value, mode = 'Overwrite') {
       const shouldCheck = value === true ||
@@ -286,7 +299,7 @@
 
       // Click to change state if needed
       if (element.checked !== shouldCheck) {
-        this.dispatchMouseEvent(element, 'click');
+        this.clickToggleElement(element);
       }
 
       // Dispatch change events
@@ -316,7 +329,7 @@
 
       // Click to select
       if (!element.checked) {
-        this.dispatchMouseEvent(element, 'click');
+        this.clickToggleElement(element);
       }
 
       // Dispatch change events

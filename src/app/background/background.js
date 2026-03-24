@@ -240,18 +240,31 @@ async function handleMessage(message, sender) {
       // Save profile
       await Storage.saveProfile(profile);
 
-      // Create rules for each field
+      // Load existing rules to avoid duplicates
+      const existingRules = await Storage.getRulesForProfile(profile.id);
+
+      // Create or update rules for each field
       const rules = [];
       for (const field of data.fields) {
-        const rule = {
-          id: generateRuleId(),
-          type: field.type || 'Text',
-          name: field.name,
-          value: field.value,
-          site: data.siteUrl || null,
-          mode: 'Overwrite',
-          profileId: profile.id
-        };
+        // Check if a rule with the same name already exists for this profile
+        let rule = existingRules.find(r => r.name === field.name);
+
+        if (rule) {
+          // Update existing rule
+          rule.value = field.value;
+          rule.type = field.type || rule.type;
+        } else {
+          // Create new rule
+          rule = {
+            id: generateRuleId(),
+            type: field.type || 'Text',
+            name: field.name,
+            value: field.value,
+            site: data.siteUrl || null,
+            mode: 'Overwrite',
+            profileId: profile.id
+          };
+        }
         await Storage.saveRule(rule);
         rules.push(rule);
       }
