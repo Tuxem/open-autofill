@@ -59,7 +59,8 @@
 
     // Fill a single field
     fillField(element, rule) {
-      const fieldType = rule.type || window.OpenAutofillFormDetector.getFieldType(element);
+      const rawType = rule.type || window.OpenAutofillFormDetector.getFieldType(element);
+      const fieldType = rawType.charAt(0).toUpperCase() + rawType.slice(1).toLowerCase();
       const mode = rule.mode || 'Overwrite';
       const value = rule.value;
       const dispatcher = window.OpenAutofillEventDispatcher;
