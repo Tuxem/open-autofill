@@ -339,6 +339,9 @@ async function handleMessage(message, sender) {
     case MESSAGE_TYPES.FORCE_SYNC:
       return Sync.fullSync();
 
+    case MESSAGE_TYPES.SETUP_SYNC:
+      return Sync.setupSync();
+
     // ============== SETTINGS ==============
 
     case MESSAGE_TYPES.GET_SETTINGS: {

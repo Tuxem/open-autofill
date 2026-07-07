@@ -13,7 +13,7 @@ export async function loadSettings() {
   try {
     const { settings, syncState } = await sendMessage('GET_SETTINGS');
 
-    document.getElementById('sheet-id').value = settings.sheetId || '';
+    document.getElementById('sheet-id').value = extractSheetId(settings.sheetId);
     document.getElementById('profiles-tab').value = settings.profilesTabName || 'Profiles';
     document.getElementById('rules-tab').value = settings.rulesTabName || 'Rules';
     document.getElementById('sync-interval').value = settings.syncIntervalMinutes || 10;
@@ -51,28 +51,76 @@ export async function loadStats() {
   }
 }
 
-/**
- * Handle saving Google Sheet settings
- */
+// Accept either a bare sheet ID or a Google Sheets/Drive URL and return the ID.
+// Handles: docs.google.com/spreadsheets/d/<id>/..., docs.google.com/spreadsheets/u/0/d/<id>/...,
+// drive.google.com/open?id=<id>, drive.google.com/file/d/<id>/..., bare ID.
+function extractSheetId(raw) {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return '';
+
+  const patterns = [
+    /\/spreadsheets\/(?:u\/\d+\/)?d\/([a-zA-Z0-9-_]+)/,
+    /\/file\/d\/([a-zA-Z0-9-_]+)/,
+    /[?&]id=([a-zA-Z0-9-_]+)/
+  ];
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+    if (match) return match[1];
+  }
+  return trimmed;
+}
+
 export async function handleSaveSheetSettings() {
+  const btn = document.getElementById('btn-save-sheet');
+  const originalText = btn ? btn.textContent : null;
   try {
-    const sheetId = document.getElementById('sheet-id').value.trim();
+    const sheetIdInput = document.getElementById('sheet-id');
+    const sheetId = extractSheetId(sheetIdInput.value);
+    sheetIdInput.value = sheetId;
     const profilesTabName = document.getElementById('profiles-tab').value.trim();
     const rulesTabName = document.getElementById('rules-tab').value.trim();
 
     await sendMessage('UPDATE_SETTINGS', {
       settings: {
         sheetId,
-        profilesTabName,
-        rulesTabName
+        profilesTabName: profilesTabName || 'Profiles',
+        rulesTabName: rulesTabName || 'Rules'
       }
     });
 
     showToast('Sheet settings saved', 'success');
 
+    // Attempt a recovery sync: import existing sheet data, or create the
+    // spreadsheet/tabs and push local data up if they don't exist yet.
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Syncing...';
+    }
+
+    const result = await sendMessage('SETUP_SYNC');
+
+    if (result && result.success) {
+      if (result.action === 'created-spreadsheet') {
+        showToast(`New Google Sheet created — uploaded ${result.profilesCount} profiles, ${result.rulesCount} rules`, 'success');
+      } else if (result.action === 'created-tabs') {
+        showToast(`Created tab(s) ${result.createdTabs.join(', ')} — uploaded ${result.profilesCount} profiles, ${result.rulesCount} rules`, 'success');
+      } else {
+        showToast(`Sheet found — imported ${result.profilesCount} profiles, ${result.rulesCount} rules`, 'success');
+      }
+    }
+
+    // Sheet ID may have changed (new spreadsheet) and data may have been imported
+    await loadSettings();
+    await loadStats();
+
   } catch (error) {
-    console.error('Failed to save settings:', error);
-    showToast('Failed to save settings: ' + error.message, 'error');
+    console.error('Failed to setup sheet:', error);
+    showToast('Failed to setup sheet: ' + error.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalText || 'Save Sheet Settings';
+    }
   }
 }
 
@@ -132,6 +180,14 @@ export function setupSettingsListeners() {
   document.getElementById('btn-save-sheet').addEventListener('click', handleSaveSheetSettings);
   document.getElementById('btn-save-sync').addEventListener('click', handleSaveSyncSettings);
   document.getElementById('btn-sync-now').addEventListener('click', handleSyncNow);
+
+  const sheetIdInput = document.getElementById('sheet-id');
+  const normalizeSheetIdField = () => {
+    const extracted = extractSheetId(sheetIdInput.value);
+    if (extracted !== sheetIdInput.value) sheetIdInput.value = extracted;
+  };
+  sheetIdInput.addEventListener('paste', () => setTimeout(normalizeSheetIdField, 0));
+  sheetIdInput.addEventListener('blur', normalizeSheetIdField);
 }
 
 export default {

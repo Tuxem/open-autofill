@@ -11,7 +11,8 @@ import { OAuth } from './oauth.js';
 async function sheetsRequest(endpoint, options = {}) {
   const accessToken = await OAuth.getValidAccessToken();
 
-  const response = await fetch(`${SHEETS_API.baseUrl}${endpoint}`, {
+  const url = `${SHEETS_API.baseUrl}${endpoint}`;
+  const response = await fetch(url, {
     ...options,
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -21,8 +22,28 @@ async function sheetsRequest(endpoint, options = {}) {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }));
-    throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    const rawBody = await response.text().catch(() => '');
+    let parsedMessage = null;
+    try {
+      const parsed = JSON.parse(rawBody);
+      parsedMessage = parsed?.error?.message || null;
+    } catch (_) {
+      // body wasn't JSON
+    }
+
+    console.error('Sheets API request failed', {
+      url,
+      method: options.method || 'GET',
+      status: response.status,
+      statusText: response.statusText,
+      body: rawBody.slice(0, 500)
+    });
+
+    const detail = parsedMessage
+      || (rawBody ? rawBody.slice(0, 200) : null)
+      || response.statusText
+      || 'no response body';
+    throw new Error(`Sheets API error (HTTP ${response.status}) ${options.method || 'GET'} ${url}: ${detail}`);
   }
 
   return response.json();
@@ -155,6 +176,155 @@ async function clearSheetRow(sheetId, tabName, rowNumber) {
   await sheetsRequest(`/${sheetId}/values/${range}:clear`, {
     method: 'POST'
   });
+}
+
+// Create a brand-new spreadsheet with the Profiles and Rules tabs
+async function createSpreadsheet(profilesTabName, rulesTabName) {
+  const data = await sheetsRequest('', {
+    method: 'POST',
+    body: JSON.stringify({
+      properties: { title: 'Open Autofill' },
+      sheets: [
+        { properties: { title: profilesTabName } },
+        { properties: { title: rulesTabName } }
+      ]
+    })
+  });
+  return data.spreadsheetId;
+}
+
+// Add a new tab (sheet) to an existing spreadsheet
+async function addSheetTab(sheetId, tabName) {
+  await sheetsRequest(`/${sheetId}:batchUpdate`, {
+    method: 'POST',
+    body: JSON.stringify({
+      requests: [{ addSheet: { properties: { title: tabName } } }]
+    })
+  });
+}
+
+// Write the header row (row 1) of a tab
+async function writeHeaderRow(sheetId, tabName, headers) {
+  const range = encodeURIComponent(`${tabName}!A1`);
+  await sheetsRequest(`/${sheetId}/values/${range}?valueInputOption=USER_ENTERED`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      range: `${tabName}!A1`,
+      majorDimension: 'ROWS',
+      values: [headers]
+    })
+  });
+}
+
+// Push every local profile and rule to the configured sheet
+async function pushAllLocalData() {
+  const profiles = await Storage.getProfiles();
+  const rules = await Storage.getRules();
+
+  for (const profile of Object.values(profiles)) {
+    await pushProfile(profile);
+  }
+  for (const rule of Object.values(rules)) {
+    await pushRule(rule);
+  }
+
+  return {
+    profilesCount: Object.keys(profiles).length,
+    rulesCount: Object.keys(rules).length
+  };
+}
+
+// Setup sync when the user saves sheet settings.
+// - No spreadsheet configured -> create one and push local data into it.
+// - Spreadsheet configured but missing tabs -> create the missing tabs and push local data.
+// - All required tabs already exist -> import (pull) their data into local storage.
+async function setupSync() {
+  // Make sure we have a usable Google session (prompt if needed)
+  const isAuth = await Storage.isAuthenticated();
+  if (!isAuth) {
+    await OAuth.startAuthFlow();
+  }
+
+  const settings = await Storage.getSettings();
+  const profilesTabName = settings.profilesTabName;
+  const rulesTabName = settings.rulesTabName;
+
+  // Case 1: no spreadsheet yet -> create one and push local data up
+  if (!settings.sheetId) {
+    const sheetId = await createSpreadsheet(profilesTabName, rulesTabName);
+    await writeHeaderRow(sheetId, profilesTabName, SHEET_HEADERS.profiles);
+    await writeHeaderRow(sheetId, rulesTabName, SHEET_HEADERS.rules);
+
+    await Storage.updateSettings({ sheetId });
+    await Storage.updateSyncState({ profileRowMapping: {}, ruleRowMapping: {} });
+
+    const pushed = await pushAllLocalData();
+
+    await Storage.updateSyncState({
+      lastSyncAt: Date.now(),
+      lastSyncStatus: 'success',
+      lastSyncError: null
+    });
+
+    return {
+      success: true,
+      action: 'created-spreadsheet',
+      sheetId,
+      createdTabs: [profilesTabName, rulesTabName],
+      ...pushed
+    };
+  }
+
+  // Case 2: spreadsheet configured -> verify access and that the tabs exist
+  const sheetId = settings.sheetId;
+  const sheetsMeta = await getSheetMetadata(sheetId); // throws if not accessible
+  const existingTitles = new Set(
+    sheetsMeta.map(s => s.properties && s.properties.title).filter(Boolean)
+  );
+
+  const tabs = [
+    { name: profilesTabName, headers: SHEET_HEADERS.profiles },
+    { name: rulesTabName, headers: SHEET_HEADERS.rules }
+  ];
+
+  const createdTabs = [];
+  for (const tab of tabs) {
+    if (!existingTitles.has(tab.name)) {
+      await addSheetTab(sheetId, tab.name);
+      await writeHeaderRow(sheetId, tab.name, tab.headers);
+      createdTabs.push(tab.name);
+    }
+  }
+
+  // All required tabs already existed -> import the sheet data (Google wins)
+  if (createdTabs.length === 0) {
+    const pullResult = await pullFromSheets();
+    return {
+      success: true,
+      action: 'imported',
+      sheetId,
+      createdTabs: [],
+      ...pullResult
+    };
+  }
+
+  // We just created (some) empty tabs -> push local data up so nothing is lost
+  await Storage.updateSyncState({ profileRowMapping: {}, ruleRowMapping: {} });
+  const pushed = await pushAllLocalData();
+
+  await Storage.updateSyncState({
+    lastSyncAt: Date.now(),
+    lastSyncStatus: 'success',
+    lastSyncError: null
+  });
+
+  return {
+    success: true,
+    action: 'created-tabs',
+    sheetId,
+    createdTabs,
+    ...pushed
+  };
 }
 
 // Pull data from Google Sheets to local storage
@@ -450,6 +620,7 @@ export const Sync = {
   deleteProfileFromSheet,
   deleteRuleFromSheet,
   fullSync,
+  setupSync,
   processPendingWrites,
   queueWrite,
   // Utility exports for testing

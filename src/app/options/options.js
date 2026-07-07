@@ -62,6 +62,10 @@ export function formatDate(timestamp) {
 async function init() {
   console.log('Initializing Open Autofill options page...');
 
+  const version = browser.runtime.getManifest().version;
+  document.getElementById('header-version').textContent = `v${version}`;
+  document.getElementById('about-version').textContent = version;
+
   // Setup event listeners for all components
   ModalManager.setupModalListeners();
   AuthSection.setupAuthListeners();
