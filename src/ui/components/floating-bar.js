@@ -367,7 +367,7 @@
 
         if (result.success) {
           const count = result.results?.filled?.length || 0;
-          this.showStatus(`Filled ${count} field${count !== 1 ? 's' : ''}`, 'success');
+          this.showStatus(result.message, count > 0 ? 'success' : 'error');
         } else {
           this.showStatus(result.message || 'Fill failed', 'error');
         }

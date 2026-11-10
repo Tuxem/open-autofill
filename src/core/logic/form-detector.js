@@ -16,34 +16,52 @@
       all: 'input, textarea, select'
     },
 
-    // Find a field by its identifier (id, name, or CSS selector)
+    // Find a field by its identifier (id, name, or CSS selector).
+    // Only fillable controls are returned: a match on a button, link, <meta> or
+    // wrapper <div> must never be filled — clicking a submit button as if it were
+    // a checkbox submits the form and reloads the page, wiping every filled value.
     findField(identifier) {
       if (!identifier) return null;
 
-      // Try by ID first
-      let element = document.getElementById(identifier);
-      if (element) return element;
+      const escaped = CSS.escape(identifier);
+      const strategies = [
+        () => document.querySelectorAll(`[id="${escaped}"]`),
+        () => document.querySelectorAll(`[name="${escaped}"]`),
+        () => {
+          try {
+            return document.querySelectorAll(identifier);
+          } catch (e) {
+            return []; // Not a valid CSS selector
+          }
+        },
+        // Partial matches (id contains, name contains)
+        () => document.querySelectorAll(`[id*="${escaped}"]`),
+        () => document.querySelectorAll(`[name*="${escaped}"]`)
+      ];
 
-      // Try by name attribute
-      element = document.querySelector(`[name="${CSS.escape(identifier)}"]`);
-      if (element) return element;
-
-      // Try as CSS selector
-      try {
-        element = document.querySelector(identifier);
+      for (const strategy of strategies) {
+        const element = this.pickControl(strategy());
         if (element) return element;
-      } catch (e) {
-        // Invalid selector, ignore
       }
 
-      // Try partial matches (id contains, name contains)
-      element = document.querySelector(`[id*="${CSS.escape(identifier)}"]`);
-      if (element) return element;
-
-      element = document.querySelector(`[name*="${CSS.escape(identifier)}"]`);
-      if (element) return element;
-
       return null;
+    },
+
+    // Whether an element is a form control the filler knows how to fill
+    isFillableControl(element) {
+      if (!element || !element.tagName) return false;
+      const tag = element.tagName.toUpperCase();
+      if (tag === 'SELECT' || tag === 'TEXTAREA') return true;
+      if (tag !== 'INPUT') return false;
+      const type = this.getFieldType(element);
+      return type === 'Text' || type === 'Checkbox' || type === 'Radio';
+    },
+
+    // Among candidates, prefer the first visible fillable control (pages often
+    // ship hidden duplicates, e.g. mobile + desktop versions of the same form)
+    pickControl(candidates) {
+      const controls = Array.from(candidates).filter(el => this.isFillableControl(el));
+      return controls.find(el => this.isVisibleAndEnabled(el)) || controls[0] || null;
     },
 
     // Find all form fields on the page

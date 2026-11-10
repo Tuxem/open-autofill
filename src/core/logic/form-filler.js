@@ -54,7 +54,54 @@
         }
       }
 
+      this.logResults(results);
       return results;
+    },
+
+    // Log a per-rule report so a fill that "does nothing" can be diagnosed
+    logResults(results) {
+      const describe = (element) => {
+        if (!element) return '';
+        const tag = element.tagName.toLowerCase();
+        const type = element.type ? `[type=${element.type}]` : '';
+        const id = element.id ? `#${element.id}` : '';
+        return `${tag}${type}${id}`;
+      };
+      const row = (rule, outcome, element) => ({
+        field: rule.name,
+        type: rule.type || '',
+        site: rule.site || '',
+        outcome,
+        element: describe(element)
+      });
+
+      const rows = [
+        ...results.filled.map(({ rule, element }) => row(rule, 'filled', element)),
+        ...results.skipped.map(({ rule, reason }) => row(rule, reason)),
+        ...results.notFound.map(({ rule }) => row(rule, 'not_found')),
+        ...results.errors.map(({ rule, error }) => row(rule, `error: ${error}`))
+      ];
+
+      console.groupCollapsed(`Open Autofill: filled ${results.filled.length}/${rows.length} rules`);
+      console.table(rows);
+      console.groupEnd();
+    },
+
+    // Human-readable outcome of a fill, shown in the floating bar
+    summarize(results) {
+      const count = results.filled.length;
+      let message = `Filled ${count} field${count !== 1 ? 's' : ''}`;
+
+      const details = [];
+      const hidden = results.skipped.filter(s => s.reason === 'element_hidden_or_disabled').length;
+      const otherSkipped = results.skipped.length - hidden;
+      if (results.notFound.length) details.push(`${results.notFound.length} not found`);
+      if (hidden) details.push(`${hidden} hidden`);
+      if (otherSkipped) details.push(`${otherSkipped} skipped`);
+      if (results.errors.length) details.push(`${results.errors.length} errors`);
+
+      if (details.length) message += ` (${details.join(', ')})`;
+      return message;
     },
 
     // Fill a single field
@@ -130,9 +177,10 @@
         const rules = response.rules || [];
 
         if (rules.length === 0) {
+          console.log('Open Autofill: no rules for profile', profileId, 'on', siteUrl);
           return {
             success: true,
-            message: 'No rules found for this profile',
+            message: 'No rules for this profile on this page',
             results: { filled: [], skipped: [], notFound: [], errors: [] }
           };
         }
@@ -142,7 +190,7 @@
 
         return {
           success: true,
-          message: `Filled ${results.filled.length} fields`,
+          message: this.summarize(results),
           results
         };
 
@@ -156,28 +204,17 @@
       }
     },
 
-    // URL matching helper
+    // URL matching helper: host only, path ignored.
+    // Keep in sync with urlMatchesPattern in core/storage/storage.js.
     urlMatches(currentUrl, pattern) {
       if (!pattern) return true;
 
       try {
-        const current = new URL(currentUrl);
+        const currentHost = new URL(currentUrl).hostname.toLowerCase();
         const patternUrl = pattern.includes('://') ? new URL(pattern) : new URL('https://' + pattern);
-
-        const currentHost = current.hostname.toLowerCase();
         const patternHost = patternUrl.hostname.toLowerCase();
 
-        if (currentHost !== patternHost && !currentHost.endsWith('.' + patternHost)) {
-          return false;
-        }
-
-        if (patternUrl.pathname && patternUrl.pathname !== '/') {
-          if (!current.pathname.startsWith(patternUrl.pathname)) {
-            return false;
-          }
-        }
-
-        return true;
+        return currentHost === patternHost || currentHost.endsWith('.' + patternHost);
       } catch (e) {
         return currentUrl.includes(pattern);
       }

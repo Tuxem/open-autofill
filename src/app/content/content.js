@@ -84,8 +84,8 @@
         if (result.success) {
           const count = result.results?.filled?.length || 0;
           window.OpenAutofillFloatingBar.showStatus(
-            `Filled ${count} field${count !== 1 ? 's' : ''}`,
-            'success'
+            result.message,
+            count > 0 ? 'success' : 'error'
           );
         } else {
           window.OpenAutofillFloatingBar.showStatus(result.message, 'error');
