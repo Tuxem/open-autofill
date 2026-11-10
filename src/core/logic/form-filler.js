@@ -214,6 +214,9 @@
         const patternUrl = pattern.includes('://') ? new URL(pattern) : new URL('https://' + pattern);
         const patternHost = patternUrl.hostname.toLowerCase();
 
+        // Hostless pattern (file: page): only that exact page, never every site
+        if (!patternHost) return currentUrl.startsWith(pattern);
+
         return currentHost === patternHost || currentHost.endsWith('.' + patternHost);
       } catch (e) {
         return currentUrl.includes(pattern);

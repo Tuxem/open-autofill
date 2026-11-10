@@ -250,20 +250,29 @@ export function urlMatchesPattern(url, pattern) {
     const patternUrl = pattern.includes('://') ? new URL(pattern) : new URL('https://' + pattern);
     const patternHost = patternUrl.hostname.toLowerCase();
 
+    // Hostless pattern (file: page): only that exact page, never every site
+    if (!patternHost) return url.startsWith(pattern);
+
     return currentHost === patternHost || currentHost.endsWith('.' + patternHost);
   } catch (e) {
     return url.includes(pattern);
   }
 }
 
-// Site pattern stored when saving from a page: its host, not its full URL
+// Site pattern stored when saving from a page: its host for web pages. Any other
+// page (file:, ...) keeps its full URL so the rule stays scoped to it: falling
+// back to null would make the rule apply on every site.
 export function siteFromUrl(url) {
   if (!url) return null;
   try {
-    return new URL(url).host || null;
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.host;
+    }
   } catch (e) {
-    return null;
+    // Unparseable: keep it verbatim below
   }
+  return url;
 }
 
 // Export the storage API
