@@ -1,6 +1,6 @@
 {
   "name": "open-autofill",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Browser extension for automatic form filling with Google Sheets sync",
   "scripts": {
     "build:css": "tailwindcss -i ./src/ui/styles/input.css -o ./src/ui/styles/output.css --minify",

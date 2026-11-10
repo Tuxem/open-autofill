@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Open Autofill",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Form autofill extension with bi-directional Google Sheets synchronization",
 
   "permissions": [
@@ -34,6 +34,7 @@
         "src/core/network/messaging.js",
         "src/core/logic/event-dispatcher.js",
         "src/core/logic/form-detector.js",
+        "src/core/logic/debug-trace.js",
         "src/core/logic/form-filler.js",
         "src/core/logic/field-extractor.js",
         "src/app/content/mutation-watcher.js",

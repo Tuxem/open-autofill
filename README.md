@@ -105,6 +105,10 @@ The extension writes cells with `valueInputOption=RAW`, so values are stored ver
 2. Select a profile from the dropdown
 3. Click "Fill" or press the profile's hotkey
 
+Pages that re-render part of the form after a change (ajax zones) are handled: for 8 seconds after a fill, fields the page empties or adds are filled again. Pages that reload themselves after a change are filled again on the reloaded page, if it loads within 30 seconds, at most 3 fills in a row; typing or clicking in the page cancels this.
+
+If a fill does not do what you expect, turn on **Verbose console logs** (Options > Data Management) and open the web console (F12): each fill is traced line by line, prefixed with `[OA]` (field found, value before and after, requests the page sends, fields it replaces, page reloads), followed by a report after 15 seconds. Filled values appear in the trace.
+
 ### Saving Form Data
 
 1. Fill out a form manually
@@ -161,6 +165,7 @@ open-autofill/
     │       ├── form-detector.js    # Form detection engine
     │       ├── field-extractor.js  # Field data extraction
     │       ├── form-filler.js      # Form filling engine
+    │       ├── debug-trace.js      # Verbose fill trace (opt-in)
     │       └── event-dispatcher.js # DOM event simulation
     │
     ├── app/                  # Extension entry points

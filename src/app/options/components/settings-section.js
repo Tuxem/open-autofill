@@ -17,6 +17,7 @@ export async function loadSettings() {
     document.getElementById('profiles-tab').value = settings.profilesTabName || 'Profiles';
     document.getElementById('rules-tab').value = settings.rulesTabName || 'Rules';
     document.getElementById('sync-interval').value = settings.syncIntervalMinutes || 10;
+    document.getElementById('debug-logging').checked = !!settings.debugLogging;
 
     // Sync status
     document.getElementById('last-sync').textContent = formatDate(syncState.lastSyncAt);
@@ -144,6 +145,21 @@ export async function handleSaveSyncSettings() {
 }
 
 /**
+ * Handle the verbose console logs checkbox (saved as soon as it changes)
+ */
+export async function handleDebugLoggingChange(event) {
+  const debugLogging = event.target.checked;
+  try {
+    await sendMessage('UPDATE_SETTINGS', { settings: { debugLogging } });
+    showToast(debugLogging ? 'Verbose console logs on' : 'Verbose console logs off', 'success');
+  } catch (error) {
+    event.target.checked = !debugLogging;
+    console.error('Failed to save debug logging setting:', error);
+    showToast('Failed to save settings: ' + error.message, 'error');
+  }
+}
+
+/**
  * Handle manual sync button
  */
 export async function handleSyncNow() {
@@ -180,6 +196,7 @@ export function setupSettingsListeners() {
   document.getElementById('btn-save-sheet').addEventListener('click', handleSaveSheetSettings);
   document.getElementById('btn-save-sync').addEventListener('click', handleSaveSyncSettings);
   document.getElementById('btn-sync-now').addEventListener('click', handleSyncNow);
+  document.getElementById('debug-logging').addEventListener('change', handleDebugLoggingChange);
 
   const sheetIdInput = document.getElementById('sheet-id');
   const normalizeSheetIdField = () => {
@@ -196,5 +213,6 @@ export default {
   handleSaveSheetSettings,
   handleSaveSyncSettings,
   handleSyncNow,
+  handleDebugLoggingChange,
   setupSettingsListeners
 };

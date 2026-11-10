@@ -141,6 +141,44 @@ browser.action.onClicked.addListener(async (tab) => {
   }
 });
 
+// ============== FILL RESUME ==============
+
+// A fill armed by a content script (FormFiller.armResume) runs again on the
+// next page load of the same tab and origin, if it comes within the window.
+// Kept here rather than in page storage so a page can never trigger a fill.
+// In memory only: the window is no longer than the event page's idle timeout.
+const RESUME_WINDOW_MS = 30000;
+const resumeByTab = new Map();
+
+function senderOrigin(sender) {
+  try {
+    return new URL(sender.url).origin;
+  } catch (e) {
+    return null;
+  }
+}
+
+function armFillResume(sender, profileId, pass) {
+  if (!sender.tab || sender.frameId !== 0 || !profileId) return;
+  resumeByTab.set(sender.tab.id, {
+    profileId,
+    pass,
+    origin: senderOrigin(sender),
+    armedAt: Date.now()
+  });
+}
+
+function takeFillResume(sender) {
+  if (!sender.tab || sender.frameId !== 0) return {};
+  const entry = resumeByTab.get(sender.tab.id);
+  resumeByTab.delete(sender.tab.id);
+  if (!entry || Date.now() - entry.armedAt > RESUME_WINDOW_MS) return {};
+  if (!entry.origin || entry.origin !== senderOrigin(sender)) return {};
+  return { profileId: entry.profileId, pass: entry.pass };
+}
+
+browser.tabs.onRemoved.addListener(tabId => resumeByTab.delete(tabId));
+
 // ============== MESSAGE HANDLER ==============
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -517,6 +555,17 @@ async function handleMessage(message, sender) {
     }
 
     // ============== FILL ==============
+
+    case MESSAGE_TYPES.ARM_FILL_RESUME:
+      armFillResume(sender, data.profileId, data.pass);
+      return { success: true };
+
+    case MESSAGE_TYPES.DISARM_FILL_RESUME:
+      if (sender.tab) resumeByTab.delete(sender.tab.id);
+      return { success: true };
+
+    case MESSAGE_TYPES.TAKE_FILL_RESUME:
+      return takeFillResume(sender);
 
     case MESSAGE_TYPES.FILL_FORM: {
       // Forward to content script

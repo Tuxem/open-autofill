@@ -362,7 +362,8 @@
       try {
         const result = await window.OpenAutofillFormFiller.fillWithProfile(
           this.selectedProfileId,
-          window.location.href
+          window.location.href,
+          { onRefill: (count) => this.showRefillStatus(count) }
         );
 
         if (result.success) {
@@ -384,6 +385,12 @@
       if (window.OpenAutofillSaveDialog) {
         window.OpenAutofillSaveDialog.show();
       }
+    },
+
+    // The page wiped fields after the fill and they were put back
+    showRefillStatus(count) {
+      if (!this.isVisible) return;
+      this.showStatus(`Refilled ${count} field${count !== 1 ? 's' : ''} after the page updated`, 'success');
     },
 
     // Show status message

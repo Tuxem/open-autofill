@@ -29,6 +29,30 @@
     browser.runtime.onMessage.addListener(handleMessage);
 
     console.log('Open Autofill: Content script ready');
+
+    resumeFillAfterReload();
+  }
+
+  // The page reloaded itself right after a fill (see FormFiller.armResume):
+  // fill again what the reload emptied
+  async function resumeFillAfterReload() {
+    if (!window.OpenAutofillFormFiller.takeResumeHint()) return;
+
+    let resume;
+    try {
+      resume = await browser.runtime.sendMessage({ type: 'TAKE_FILL_RESUME' });
+    } catch (error) {
+      return;
+    }
+    if (!resume || !resume.profileId) return;
+
+    const filler = window.OpenAutofillFormFiller;
+    console.log(`Open Autofill: the page reloaded after a fill, filling again (pass ${resume.pass}/${filler.MAX_FILL_PASSES})`);
+    // Let the page's own load-time scripts run first
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    const result = await handleFillForm({ profileId: resume.profileId, pass: resume.pass });
+    if (result && result.message) console.log(`Open Autofill: ${result.message}`);
   }
 
   // Handle messages from background script
@@ -76,7 +100,11 @@
     try {
       const result = await window.OpenAutofillFormFiller.fillWithProfile(
         data.profileId,
-        window.location.href
+        window.location.href,
+        {
+          pass: data.pass,
+          onRefill: (count) => window.OpenAutofillFloatingBar.showRefillStatus(count)
+        }
       );
 
       // Show result in floating bar if visible

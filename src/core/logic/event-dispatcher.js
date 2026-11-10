@@ -251,42 +251,34 @@
         return false;
       }
 
-      // Focus
+      // No matching option (yet: it may be loaded later by the page): leave the
+      // select alone rather than firing change events on an unchanged value
+      const option = this.findOption(element, value);
+      if (!option) return false;
+
       element.focus();
       this.dispatchFocusEvent(element, 'focus');
 
-      // Find the option by value or text
-      let optionFound = false;
-      for (const option of element.options) {
-        if (option.value === value || option.text === value || option.textContent.trim() === value) {
-          element.value = option.value;
-          optionFound = true;
-          break;
-        }
-      }
+      element.value = option.value;
 
-      if (!optionFound) {
-        // Try case-insensitive match
-        const lowerValue = value.toLowerCase();
-        for (const option of element.options) {
-          if (option.value.toLowerCase() === lowerValue ||
-              option.text.toLowerCase() === lowerValue ||
-              option.textContent.trim().toLowerCase() === lowerValue) {
-            element.value = option.value;
-            optionFound = true;
-            break;
-          }
-        }
-      }
-
-      // Dispatch change events
       this.dispatchInputEvent(element, 'input');
       this.dispatchNativeEvent(element, 'change');
-
-      // Blur
       this.dispatchFocusEvent(element, 'blur');
 
-      return optionFound;
+      return true;
+    },
+
+    // Option of a select matching a rule value: by value or label, exact first,
+    // then case-insensitive
+    findOption(select, value) {
+      const wanted = String(value ?? '');
+      const lower = wanted.toLowerCase();
+      const options = Array.from(select.options);
+      return options.find(o => o.value === wanted || o.text === wanted || o.textContent.trim() === wanted)
+        || options.find(o => o.value.toLowerCase() === lower ||
+                             o.text.toLowerCase() === lower ||
+                             o.textContent.trim().toLowerCase() === lower)
+        || null;
     },
 
     // Click a radio/checkbox element, falling back to its label for CSS-hidden inputs
@@ -302,13 +294,18 @@
       this.dispatchMouseEvent(element, 'click');
     },
 
+    // Whether a rule value means "checked/selected". Case-insensitive, and
+    // includes the localized booleans Google Sheets renders for values written
+    // before the switch to RAW (TRUE, VRAI, ...)
+    isTruthy(value) {
+      if (value === true) return true;
+      const truthy = ['true', '1', 'yes', 'on', 'checked', 'vrai', 'oui', 'wahr', 'verdadero', 'vero', 'verdadeiro', 'waar'];
+      return truthy.includes(String(value ?? '').trim().toLowerCase());
+    },
+
     // Fill a checkbox
     fillCheckbox(element, value, mode = 'Overwrite') {
-      // Case-insensitive, and includes the localized booleans Google Sheets
-      // renders for values written before the switch to RAW (TRUE, VRAI, ...)
-      const truthy = ['true', '1', 'yes', 'on', 'checked', 'vrai', 'oui', 'wahr', 'verdadero', 'vero', 'verdadeiro', 'waar'];
-      const shouldCheck = value === true ||
-                         truthy.includes(String(value ?? '').trim().toLowerCase());
+      const shouldCheck = this.isTruthy(value);
 
       if (mode === 'Skip if filled' && element.checked === shouldCheck) {
         return false;

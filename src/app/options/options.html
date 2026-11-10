@@ -187,6 +187,14 @@
             <button class="btn btn-secondary" id="btn-import">Import Data</button>
             <input type="file" id="import-file" accept=".json" class="hidden">
           </div>
+
+          <div class="border-t border-gray-200 mt-4 pt-4 dark:border-gray-700">
+            <label class="flex items-center gap-2 text-gray-700 dark:text-gray-300" for="debug-logging">
+              <input type="checkbox" id="debug-logging">
+              Verbose console logs
+            </label>
+            <small class="form-hint">Traces every fill in the page's web console (F12): the field each rule finds, its value before and after, the requests the page sends and the fields it replaces, then a report to copy. Filled values appear in the console.</small>
+          </div>
         </div>
       </section>
 

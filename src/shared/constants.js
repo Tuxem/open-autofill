@@ -22,7 +22,8 @@ export const DEFAULT_SETTINGS = {
   syncIntervalMinutes: 10,
   sheetId: null,
   profilesTabName: 'Profiles',
-  rulesTabName: 'Rules'
+  rulesTabName: 'Rules',
+  debugLogging: false
 };
 
 // Default sync state
@@ -95,6 +96,9 @@ export const MESSAGE_TYPES = {
   SAVE_FIELD_DATA: 'SAVE_FIELD_DATA',
   TRIGGER_SYNC: 'TRIGGER_SYNC',
   GET_AUTH_STATUS: 'GET_AUTH_STATUS',
+  ARM_FILL_RESUME: 'ARM_FILL_RESUME',
+  DISARM_FILL_RESUME: 'DISARM_FILL_RESUME',
+  TAKE_FILL_RESUME: 'TAKE_FILL_RESUME',
 
   // Options -> Background
   START_AUTH: 'START_AUTH',
