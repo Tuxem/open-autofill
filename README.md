@@ -84,16 +84,18 @@ Create a Google Sheet with two tabs:
 - `ID`: Unique identifier for the profile
 - `Name`: Display name for the profile
 - `Hotkey`: Keyboard shortcut (e.g., "Alt + W", "Ctrl + Shift + 1")
-- `Site`: URL pattern to match (optional, restricts profile to specific sites)
+- `Site`: Site host to match, e.g. `example.com` (optional, restricts profile to that site and its subdomains; any path in the value is ignored)
 
 **Rules:**
 - `ID`: Unique identifier for the rule
 - `Type`: Field type - "Text", "Select", "Checkbox", or "Radio"
 - `Name`: Field identifier (id, name attribute, or CSS selector)
 - `Value`: Value to fill
-- `Site`: URL pattern (optional, further restricts the rule)
+- `Site`: Site host, same matching as the profile's (optional, further restricts the rule)
 - `Mode`: "Overwrite", "Append", or "Skip if filled"
 - `Profile ID`: Links to a profile's ID
+
+The extension writes cells with `valueInputOption=RAW`, so values are stored verbatim. When typing values directly in the sheet, format the columns as plain text (Format → Number → Plain text) so Sheets keeps leading zeros, dates and booleans as typed.
 
 ## Usage
 

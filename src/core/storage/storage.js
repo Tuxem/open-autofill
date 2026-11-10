@@ -238,29 +238,31 @@ async function importData(data) {
 
 // ============== HELPERS ==============
 
-function urlMatchesPattern(url, pattern) {
+// Sites match on the host only (subdomains included); the pattern's path, query
+// and hash are ignored. Profiles and rules saved from a page used to store that
+// page's full URL, which hid them on every other page of the same site.
+// Keep in sync with FormFiller.urlMatches (content script, no module import).
+export function urlMatchesPattern(url, pattern) {
   if (!pattern) return true;
 
   try {
-    const currentUrl = new URL(url);
+    const currentHost = new URL(url).hostname.toLowerCase();
     const patternUrl = pattern.includes('://') ? new URL(pattern) : new URL('https://' + pattern);
-
-    const currentHost = currentUrl.hostname.toLowerCase();
     const patternHost = patternUrl.hostname.toLowerCase();
 
-    if (currentHost !== patternHost && !currentHost.endsWith('.' + patternHost)) {
-      return false;
-    }
-
-    if (patternUrl.pathname && patternUrl.pathname !== '/') {
-      if (!currentUrl.pathname.startsWith(patternUrl.pathname)) {
-        return false;
-      }
-    }
-
-    return true;
+    return currentHost === patternHost || currentHost.endsWith('.' + patternHost);
   } catch (e) {
     return url.includes(pattern);
+  }
+}
+
+// Site pattern stored when saving from a page: its host, not its full URL
+export function siteFromUrl(url) {
+  if (!url) return null;
+  try {
+    return new URL(url).host || null;
+  } catch (e) {
+    return null;
   }
 }
 

@@ -115,9 +115,31 @@
       return 'native';
     },
 
+    // Native date inputs only accept yyyy-mm-dd and silently drop anything else.
+    // Values written to Google Sheets before the switch to RAW came back
+    // locale-formatted (15/01/2026), so convert d/m/yyyy back to ISO. Day comes
+    // first unless that is impossible (US-style 1/15/2026).
+    normalizeDateValue(element, value) {
+      if ((element.type || '').toLowerCase() !== 'date') return value;
+
+      const match = String(value).trim().match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+      if (!match) return value;
+
+      let day = parseInt(match[1], 10);
+      let month = parseInt(match[2], 10);
+      if (month > 12 && day <= 12) {
+        [day, month] = [month, day];
+      }
+      if (month < 1 || month > 12 || day < 1 || day > 31) return value;
+
+      const pad = n => String(n).padStart(2, '0');
+      return `${match[3]}-${pad(month)}-${pad(day)}`;
+    },
+
     // Full event sequence for filling a text input
     fillTextInput(element, value, mode = 'Overwrite') {
       const framework = this.detectFramework(element);
+      value = this.normalizeDateValue(element, value);
       let finalValue = value;
 
       // Handle mode
@@ -282,12 +304,11 @@
 
     // Fill a checkbox
     fillCheckbox(element, value, mode = 'Overwrite') {
+      // Case-insensitive, and includes the localized booleans Google Sheets
+      // renders for values written before the switch to RAW (TRUE, VRAI, ...)
+      const truthy = ['true', '1', 'yes', 'on', 'checked', 'vrai', 'oui', 'wahr', 'verdadero', 'vero', 'verdadeiro', 'waar'];
       const shouldCheck = value === true ||
-                         value === 'true' ||
-                         value === '1' ||
-                         value === 'yes' ||
-                         value === 'on' ||
-                         value === 'checked';
+                         truthy.includes(String(value ?? '').trim().toLowerCase());
 
       if (mode === 'Skip if filled' && element.checked === shouldCheck) {
         return false;

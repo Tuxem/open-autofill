@@ -140,10 +140,14 @@ function localRuleToSheet(rule) {
   ];
 }
 
+// All writes use valueInputOption=RAW: values are form data and must be stored
+// verbatim. USER_ENTERED let Sheets reinterpret them (0612345678 lost its leading
+// zero, 2026-01-15 became a locale-formatted date, true became VRAI/TRUE).
+
 // Update a single row in a sheet
 async function updateSheetRow(sheetId, tabName, rowNumber, values) {
   const range = encodeURIComponent(`${tabName}!A${rowNumber}:Z${rowNumber}`);
-  await sheetsRequest(`/${sheetId}/values/${range}?valueInputOption=USER_ENTERED`, {
+  await sheetsRequest(`/${sheetId}/values/${range}?valueInputOption=RAW`, {
     method: 'PUT',
     body: JSON.stringify({
       range: `${tabName}!A${rowNumber}`,
@@ -156,7 +160,7 @@ async function updateSheetRow(sheetId, tabName, rowNumber, values) {
 // Append a new row to a sheet
 async function appendSheetRow(sheetId, tabName, values) {
   const range = encodeURIComponent(`${tabName}!A:Z`);
-  const result = await sheetsRequest(`/${sheetId}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+  const result = await sheetsRequest(`/${sheetId}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
     method: 'POST',
     body: JSON.stringify({
       majorDimension: 'ROWS',
@@ -206,7 +210,7 @@ async function addSheetTab(sheetId, tabName) {
 // Write the header row (row 1) of a tab
 async function writeHeaderRow(sheetId, tabName, headers) {
   const range = encodeURIComponent(`${tabName}!A1`);
-  await sheetsRequest(`/${sheetId}/values/${range}?valueInputOption=USER_ENTERED`, {
+  await sheetsRequest(`/${sheetId}/values/${range}?valueInputOption=RAW`, {
     method: 'PUT',
     body: JSON.stringify({
       range: `${tabName}!A1`,

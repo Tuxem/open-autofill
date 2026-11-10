@@ -10,34 +10,13 @@ import {
   CONTEXT_MENU_IDS
 } from '../../shared/constants.js';
 
-import { Storage } from '../../core/storage/storage.js';
+import { Storage, urlMatchesPattern, siteFromUrl } from '../../core/storage/storage.js';
 import { OAuth } from '../../core/network/oauth.js';
 import { Sync } from '../../core/network/sync.js';
 import { Alarms } from './alarms.js';
 import { ContextMenu } from './context-menu.js';
 
 // ============== HELPER FUNCTIONS ==============
-
-function urlMatches(currentUrl, pattern) {
-  if (!pattern) return true;
-  try {
-    const current = new URL(currentUrl);
-    const patternUrl = pattern.includes('://') ? new URL(pattern) : new URL('https://' + pattern);
-    const currentHost = current.hostname.toLowerCase();
-    const patternHost = patternUrl.hostname.toLowerCase();
-    if (currentHost !== patternHost && !currentHost.endsWith('.' + patternHost)) {
-      return false;
-    }
-    if (patternUrl.pathname && patternUrl.pathname !== '/') {
-      if (!current.pathname.startsWith(patternUrl.pathname)) {
-        return false;
-      }
-    }
-    return true;
-  } catch (e) {
-    return currentUrl.includes(pattern);
-  }
-}
 
 function generateProfileId() {
   const timestamp = Date.now().toString(36);
@@ -209,7 +188,7 @@ async function handleMessage(message, sender) {
       // Optionally filter by site
       if (data.siteUrl) {
         const filtered = rules.filter(rule =>
-          !rule.site || urlMatches(data.siteUrl, rule.site)
+          !rule.site || urlMatchesPattern(data.siteUrl, rule.site)
         );
         return { rules: filtered };
       }
@@ -232,7 +211,7 @@ async function handleMessage(message, sender) {
           id: generateProfileId(),
           name: data.profileName || 'New Profile',
           hotkey: null,
-          site: data.siteUrl || null,
+          site: siteFromUrl(data.siteUrl),
           syncedAt: null
         };
       }
@@ -260,7 +239,7 @@ async function handleMessage(message, sender) {
             type: field.type || 'Text',
             name: field.name,
             value: field.value,
-            site: data.siteUrl || null,
+            site: siteFromUrl(data.siteUrl),
             mode: 'Overwrite',
             profileId: profile.id
           };
@@ -314,7 +293,7 @@ async function handleMessage(message, sender) {
           type: data.field.type || 'Text',
           name: data.field.name,
           value: data.field.value,
-          site: data.siteUrl || null,
+          site: siteFromUrl(data.siteUrl),
           mode: 'Overwrite',
           profileId: data.profileId
         };
